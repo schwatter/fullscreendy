@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notif_channel_name">Kiosk-Dienst</string>
+    <string name="notif_channel_desc">Hält die Verbindung zu FHEM aufrecht.</string>
+    <string name="notif_title">FullScreendy aktiv</string>
+    <string name="notif_text">Verbunden mit dem Dashboard und MQTT.</string>
+</resources>

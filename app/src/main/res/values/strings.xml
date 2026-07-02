@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FullScreendy</string>
+    <string name="notif_channel_name">Kiosk service</string>
+    <string name="notif_channel_desc">Keeps the connection to FHEM alive.</string>
+    <string name="notif_title">FullScreendy running</string>
+    <string name="notif_text">Connected to the dashboard and MQTT.</string>
+</resources>

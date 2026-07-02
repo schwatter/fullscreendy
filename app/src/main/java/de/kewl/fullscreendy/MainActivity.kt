@@ -1,0 +1,309 @@
+package de.kewl.fullscreendy
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Bundle
+import android.view.WindowManager
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import de.kewl.fullscreendy.data.Settings
+import de.kewl.fullscreendy.data.SettingsRepository
+import de.kewl.fullscreendy.i18n.AppLang
+import de.kewl.fullscreendy.i18n.LocalStrings
+import de.kewl.fullscreendy.i18n.Strings
+import de.kewl.fullscreendy.kiosk.KioskBus
+import de.kewl.fullscreendy.kiosk.KioskCommand
+import de.kewl.fullscreendy.kiosk.KioskStatus
+import de.kewl.fullscreendy.service.KioskService
+import de.kewl.fullscreendy.ui.AboutScreen
+import de.kewl.fullscreendy.ui.HelpScreen
+import de.kewl.fullscreendy.ui.KioskWebView
+import de.kewl.fullscreendy.ui.PinDialog
+import de.kewl.fullscreendy.ui.SettingsScreen
+import de.kewl.fullscreendy.ui.rememberWebController
+import kotlinx.coroutines.launch
+
+private enum class AppPage { Dashboard, Settings, Help, About }
+
+class MainActivity : ComponentActivity() {
+
+    private lateinit var repo: SettingsRepository
+
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* Ergebnis egal – Features degradieren sanft ohne Berechtigung. */ }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        repo = SettingsRepository(applicationContext)
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        requestPermissions()
+        startKioskService()
+
+        setContent { KioskRoot(repo) }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideSystemBars()
+    }
+
+    private fun hideSystemBars() {
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    }
+
+    private fun requestPermissions() {
+        val needed = mutableListOf(Manifest.permission.CAMERA)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            needed += Manifest.permission.POST_NOTIFICATIONS
+        }
+        val missing = needed.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())
+    }
+
+    private fun startKioskService() {
+        ContextCompat.startForegroundService(this, Intent(this, KioskService::class.java))
+    }
+
+    fun setScreenBrightness(level: Float) {
+        window.attributes = window.attributes.apply {
+            screenBrightness = if (level < 0f)
+                WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE else level.coerceIn(0f, 1f)
+        }
+    }
+
+    fun setKeepScreenOn(on: Boolean) {
+        if (on) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    @Composable
+    private fun KioskRoot(repo: SettingsRepository) {
+        val settings by repo.settings.collectAsState(initial = Settings())
+        val strings = remember(settings.language) { Strings(AppLang.from(settings.language)) }
+
+        CompositionLocalProvider(LocalStrings provides strings) {
+            KioskContent(repo, settings)
+        }
+    }
+
+    @Composable
+    private fun KioskContent(repo: SettingsRepository, settings: Settings) {
+        val s = LocalStrings.current
+        val mqttConnected by KioskStatus.mqttConnected.collectAsState()
+        val scope = rememberCoroutineScope()
+        val webController = rememberWebController()
+        val drawerState = rememberDrawerState(DrawerValue.Closed)
+
+        var page by remember { mutableStateOf(AppPage.Dashboard) }
+        var showPin by remember { mutableStateOf(false) }
+        var overlayVisible by remember { mutableStateOf(false) }
+        var brightness by remember { mutableStateOf(-1f) }
+
+        LaunchedEffect(settings.isConfigured) {
+            if (!settings.isConfigured) page = AppPage.Settings
+        }
+        LaunchedEffect(settings.keepScreenOn) { setKeepScreenOn(settings.keepScreenOn) }
+        LaunchedEffect(overlayVisible, brightness) {
+            setScreenBrightness(if (overlayVisible) 0f else brightness)
+        }
+        LaunchedEffect(Unit) {
+            KioskBus.commands.collect { cmd ->
+                when (cmd) {
+                    is KioskCommand.LoadUrl -> webController.load(cmd.url)
+                    KioskCommand.Reload -> webController.reload()
+                    KioskCommand.ClearCache -> webController.clearCache()
+                    is KioskCommand.Screen -> overlayVisible = !cmd.on
+                    is KioskCommand.Brightness -> brightness = cmd.level
+                }
+            }
+        }
+
+        fun closeDrawer() = scope.launch { drawerState.close() }
+
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            gesturesEnabled = drawerState.isOpen,
+            drawerContent = {
+                AppDrawer(
+                    connected = mqttConnected,
+                    onDashboard = { closeDrawer(); page = AppPage.Dashboard },
+                    onReload = { closeDrawer(); webController.reload() },
+                    onClearCache = { closeDrawer(); webController.clearCache() },
+                    onScreenOff = { closeDrawer(); overlayVisible = true },
+                    onSettings = { closeDrawer(); showPin = true },
+                    onHelp = { closeDrawer(); page = AppPage.Help },
+                    onAbout = { closeDrawer(); page = AppPage.About },
+                )
+            }
+        ) {
+            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // Dashboard-WebView ist immer vorhanden; Unterseiten legen sich darüber.
+                    key(settings.ignoreSystemFontScale, settings.zoomEnabled) {
+                        KioskWebView(
+                            url = settings.dashboardUrl,
+                            controller = webController,
+                            ignoreSystemFontScale = settings.ignoreSystemFontScale,
+                            zoomEnabled = settings.zoomEnabled,
+                            pullToRefresh = settings.pullToRefresh,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
+                    if (overlayVisible) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black)
+                                .clickable {
+                                    overlayVisible = false
+                                    KioskBus.send(KioskCommand.Screen(on = true))
+                                }
+                        )
+                    }
+
+                    // Wisch-Zone am linken Rand öffnet das Menü.
+                    if (page == AppPage.Dashboard && drawerState.isClosed && !overlayVisible) {
+                        var acc by remember { mutableStateOf(0f) }
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .fillMaxHeight()
+                                .width(28.dp)
+                                .pointerInput(Unit) {
+                                    detectHorizontalDragGestures(
+                                        onDragStart = { acc = 0f },
+                                        onHorizontalDrag = { _, delta ->
+                                            acc += delta
+                                            if (acc > 120f) {
+                                                scope.launch { drawerState.open() }
+                                                acc = -1e6f
+                                            }
+                                        },
+                                        onDragEnd = { acc = 0f }
+                                    )
+                                }
+                        )
+                    }
+
+                    when (page) {
+                        AppPage.Settings -> SettingsScreen(
+                            initial = settings,
+                            onPersist = { scope.launch { repo.save(it) } },
+                            onExit = { if (settings.isConfigured) page = AppPage.Dashboard }
+                        )
+                        AppPage.Help -> HelpScreen(onBack = { page = AppPage.Dashboard })
+                        AppPage.About -> AboutScreen(settings, onBack = { page = AppPage.Dashboard })
+                        AppPage.Dashboard -> Unit
+                    }
+                }
+            }
+        }
+
+        if (showPin) {
+            PinDialog(
+                expectedPin = settings.adminPin,
+                onSuccess = { showPin = false; page = AppPage.Settings },
+                onDismiss = { showPin = false }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppDrawer(
+    connected: Boolean,
+    onDashboard: () -> Unit,
+    onReload: () -> Unit,
+    onClearCache: () -> Unit,
+    onScreenOff: () -> Unit,
+    onSettings: () -> Unit,
+    onHelp: () -> Unit,
+    onAbout: () -> Unit,
+) {
+    val s = LocalStrings.current
+    ModalDrawerSheet(modifier = Modifier.width(320.dp)) {
+        Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("FullScreendy", style = MaterialTheme.typography.headlineSmall)
+            Text("${s.version} ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall)
+            Spacer(Modifier.size(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(if (connected) Color(0xFF4CAF50) else Color(0xFF9E9E9E))
+                )
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    if (connected) s.statusConnected else s.statusDisconnected,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        HorizontalDivider()
+
+        val itemPad = Modifier.padding(horizontal = 12.dp)
+        NavigationDrawerItem(label = { Text(s.navDashboard) }, selected = false, onClick = onDashboard, modifier = itemPad)
+        NavigationDrawerItem(label = { Text(s.navReload) }, selected = false, onClick = onReload, modifier = itemPad)
+        NavigationDrawerItem(label = { Text(s.navClearCache) }, selected = false, onClick = onClearCache, modifier = itemPad)
+        NavigationDrawerItem(label = { Text(s.navScreenOff) }, selected = false, onClick = onScreenOff, modifier = itemPad)
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        NavigationDrawerItem(label = { Text(s.navSettings) }, selected = false, onClick = onSettings, modifier = itemPad)
+        NavigationDrawerItem(label = { Text(s.navHelp) }, selected = false, onClick = onHelp, modifier = itemPad)
+        NavigationDrawerItem(label = { Text(s.navAbout) }, selected = false, onClick = onAbout, modifier = itemPad)
+    }
+}
