@@ -1,7 +1,6 @@
 package de.kewl.fullscreendy.ui
 
 import android.annotation.SuppressLint
-import android.content.res.Configuration
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
@@ -13,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import kotlin.math.roundToInt
 
 /** Hält eine Referenz auf die aktive WebView, damit Befehle sie steuern können. */
 class WebController {
@@ -48,16 +48,7 @@ fun KioskWebView(
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
-            // fontScale = 1, damit die System-Schriftvergrößerung die Dashboard-Schrift
-            // NICHT beeinflusst.
-            val webCtx = if (ignoreSystemFontScale) {
-                val cfg = Configuration(ctx.resources.configuration).apply { fontScale = 1.0f }
-                ctx.createConfigurationContext(cfg)
-            } else {
-                ctx
-            }
-
-            val web = WebView(webCtx).apply {
+            val web = WebView(ctx).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.MATCH_PARENT
@@ -82,7 +73,11 @@ fun KioskWebView(
                     setSupportZoom(zoomEnabled)
                     builtInZoomControls = zoomEnabled
                     displayZoomControls = false
-                    textZoom = 100 // fixe Textgröße, unabhängig vom System
+                    // Schrift unabhängig vom System-Zoom: fontScale rechnerisch ausgleichen.
+                    textZoom = if (ignoreSystemFontScale) {
+                        val fs = ctx.resources.configuration.fontScale
+                        if (fs > 0f) (100f / fs).roundToInt() else 100
+                    } else 100
                     cacheMode = WebSettings.LOAD_DEFAULT
                     mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                 }
@@ -101,11 +96,12 @@ fun KioskWebView(
         },
         update = { refresh ->
             refresh.isEnabled = pullToRefresh
-            val web = refresh.getChildAt(0) as WebView
-            // Lädt beim ersten Aufbau und wann immer sich die URL ändert.
-            if (web.tag != url) {
-                web.tag = url
-                web.loadUrl(url)
+            // WebView aus dem Controller nehmen (getChildAt(0) wäre der Lade-Kreis).
+            controller.webView?.let { web ->
+                if (web.tag != url) {
+                    web.tag = url
+                    web.loadUrl(url)
+                }
             }
         }
     )
