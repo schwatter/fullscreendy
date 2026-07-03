@@ -23,6 +23,8 @@ import de.kewl.fullscreendy.device.BatteryState
 import de.kewl.fullscreendy.device.DeviceInfo
 import de.kewl.fullscreendy.device.MediaManager
 import de.kewl.fullscreendy.device.MotionDetector
+import de.kewl.fullscreendy.device.SoundDetector
+import de.kewl.fullscreendy.device.SystemController
 import de.kewl.fullscreendy.device.TtsManager
 import de.kewl.fullscreendy.kiosk.KioskBus
 import de.kewl.fullscreendy.kiosk.KioskCommand
@@ -45,6 +47,7 @@ class KioskService : LifecycleService() {
     private var mqtt: MqttManager? = null
     private var battery: BatteryMonitor? = null
     private var motion: MotionDetector? = null
+    private var sound: SoundDetector? = null
 
     private var settings: Settings = Settings()
     private var lastBattery: BatteryState? = null
@@ -57,7 +60,7 @@ class KioskService : LifecycleService() {
         repo = SettingsRepository(applicationContext)
         tts = TtsManager(applicationContext)
         media = MediaManager(applicationContext)
-        startForegroundInternal(cameraType = false)
+        updateForeground(camera = false, microphone = false)
 
         lifecycleScope.launch {
             repo.settings.distinctUntilChanged().collect { s ->
@@ -69,6 +72,9 @@ class KioskService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        // Von der Activity beim Fokus ausgelöst: Kamera/Mikrofon-Detektoren (neu)
+        // starten, wenn die App im Vordergrund ist (im Hintergrund oft blockiert).
+        if (intent?.action == ACTION_REFRESH) startDetectors(settings)
         return START_STICKY
     }
 
@@ -87,23 +93,47 @@ class KioskService : LifecycleService() {
             battery = BatteryMonitor(applicationContext) { state -> onBattery(state) }.also { it.start() }
         }
 
-        // Bewegungserkennung
-        val cameraGranted = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (s.motionEnabled && cameraGranted && motion == null) {
-            startForegroundInternal(cameraType = true)
-            motion = MotionDetector(applicationContext) { active -> onMotion(active) }
-                .also { it.start(this) }
-        } else if ((!s.motionEnabled || !cameraGranted) && motion != null) {
-            motion?.stop()
-            motion = null
-            startForegroundInternal(cameraType = false)
-        }
+        // Detektoren neu aufsetzen (damit u. a. die Empfindlichkeit greift).
+        motion?.stop(); motion = null
+        sound?.stop(); sound = null
+        startDetectors(s)
 
         // MQTT neu verbinden
         connectMqtt(s)
+    }
+
+    private fun granted(perm: String) =
+        ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED
+
+    /**
+     * Startet Bewegungs-/Ton-Erkennung passend zu den Einstellungen. Wird sowohl
+     * bei Einstellungsänderungen als auch beim App-Fokus (ACTION_REFRESH) aufgerufen;
+     * bereits laufende Detektoren bleiben unangetastet. Kamera/Mikrofon im Hintergrund
+     * zu starten kann fehlschlagen – daher runCatching (kein Absturz).
+     */
+    private fun startDetectors(s: Settings) {
+        val wantMotion = s.motionEnabled && granted(Manifest.permission.CAMERA)
+        val wantSound = s.soundWakeEnabled && granted(Manifest.permission.RECORD_AUDIO)
+
+        updateForeground(camera = wantMotion, microphone = wantSound)
+
+        if (wantMotion && motion == null) {
+            runCatching {
+                motion = MotionDetector(applicationContext, s.motionSensitivity) { active ->
+                    onMotion(active)
+                }.also { it.start(this) }
+            }.onFailure { Log.w(TAG, "Bewegungserkennung nicht gestartet", it) }
+        } else if (!wantMotion && motion != null) {
+            motion?.stop(); motion = null
+        }
+
+        if (wantSound && sound == null) {
+            runCatching {
+                sound = SoundDetector(s.soundSensitivity) { onSoundWake() }.also { it.start() }
+            }.onFailure { Log.w(TAG, "Tonerkennung nicht gestartet", it) }
+        } else if (!wantSound && sound != null) {
+            sound?.stop(); sound = null
+        }
     }
 
     private fun connectMqtt(s: Settings) {
@@ -183,6 +213,13 @@ class KioskService : LifecycleService() {
         }
     }
 
+    private fun onSoundWake() {
+        wakeScreen()
+        screenOn = true
+        KioskBus.send(KioskCommand.Screen(on = true))
+        publishScreen(true)
+    }
+
     @Suppress("DEPRECATION")
     private fun wakeScreen() {
         val pm = getSystemService(PowerManager::class.java) ?: return
@@ -190,7 +227,7 @@ class KioskService : LifecycleService() {
             PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
                 PowerManager.ACQUIRE_CAUSES_WAKEUP or
                 PowerManager.ON_AFTER_RELEASE,
-            "fullscreendy:motion"
+            "fullscreendy:wake"
         )
         runCatching { wl.acquire(3_000L) }
     }
@@ -220,15 +257,22 @@ class KioskService : LifecycleService() {
             "reload", "refresh" -> KioskBus.send(KioskCommand.Reload)
             "screen" -> setScreen(isOn(payload))
             "screensaver" -> setScreen(!isOn(payload)) // screensaver an == Bildschirm aus
+            "lock" -> if (!SystemController.lock(this)) Log.w(TAG, "Sperren fehlgeschlagen (Geräteadmin aktiv?)")
+            "unlock" -> KioskBus.send(KioskCommand.Unlock)
             "brightness" -> {
                 val trimmed = payload.trim().lowercase()
                 if (trimmed == "auto" || trimmed == "-1") {
                     brightnessPercent = -1
-                    KioskBus.send(KioskCommand.Brightness(-1f))
+                    KioskBus.send(KioskCommand.Brightness(-1f)) // Fenster-Override lösen
                 } else {
                     val pct = trimmed.toIntOrNull()?.coerceIn(0, 100) ?: return
                     brightnessPercent = pct
-                    KioskBus.send(KioskCommand.Brightness(pct / 100f))
+                    // Echte Hardware-Helligkeit (voller Bereich); sonst Fenster-Fallback.
+                    if (SystemController.setSystemBrightness(this, pct)) {
+                        KioskBus.send(KioskCommand.Brightness(-1f))
+                    } else {
+                        KioskBus.send(KioskCommand.Brightness(pct / 100f))
+                    }
                 }
                 publishBrightness()
             }
@@ -237,6 +281,7 @@ class KioskService : LifecycleService() {
     }
 
     private fun setScreen(on: Boolean) {
+        if (on) wakeScreen()
         screenOn = on
         KioskBus.send(KioskCommand.Screen(on))
         publishScreen(on)
@@ -249,7 +294,7 @@ class KioskService : LifecycleService() {
 
     // ---- Foreground / Notification ---------------------------------------------
 
-    private fun startForegroundInternal(cameraType: Boolean) {
+    private fun updateForeground(camera: Boolean, microphone: Boolean) {
         val openIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, MainActivity::class.java),
@@ -264,8 +309,10 @@ class KioskService : LifecycleService() {
             .build()
 
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-        if (cameraType) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
-        ServiceCompat.startForeground(this, FhemKioskApp.NOTIF_ID, notif, type)
+        if (camera) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
+        if (microphone) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+        runCatching { ServiceCompat.startForeground(this, FhemKioskApp.NOTIF_ID, notif, type) }
+            .onFailure { Log.w(TAG, "startForeground(type=$type) fehlgeschlagen", it) }
     }
 
     override fun onDestroy() {
@@ -274,6 +321,7 @@ class KioskService : LifecycleService() {
         mqtt?.disconnect()
         battery?.stop()
         motion?.stop()
+        sound?.stop()
         tts.shutdown()
         media.stop()
         super.onDestroy()
@@ -281,5 +329,6 @@ class KioskService : LifecycleService() {
 
     companion object {
         private const val TAG = "KioskService"
+        const val ACTION_REFRESH = "de.kewl.fullscreendy.action.REFRESH"
     }
 }

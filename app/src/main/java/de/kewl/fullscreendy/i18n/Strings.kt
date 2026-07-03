@@ -69,6 +69,9 @@ class Strings(private val lang: AppLang) {
     // Verhalten
     val motionDetection get() = t("Motion detection (camera)", "Bewegungserkennung (Kamera)")
     val motionWakesScreen get() = t("Motion wakes the screen", "Bewegung weckt Bildschirm")
+    val motionSensitivity get() = t("Motion sensitivity", "Bewegungs-Empfindlichkeit")
+    val soundWake get() = t("Wake on sound (microphone)", "Wecken bei Ton (Mikrofon)")
+    val soundSensitivity get() = t("Sound sensitivity", "Ton-Empfindlichkeit")
     val pullToRefresh get() = t("Pull down to reload", "Zum Aktualisieren nach unten ziehen")
     val ttsEnabled get() = t("Text-to-speech enabled", "Text-to-Speech aktiv")
     val mediaEnabled get() = t("Sound playback enabled", "Tonwiedergabe aktiv")
@@ -85,6 +88,10 @@ class Strings(private val lang: AppLang) {
     val languageGerman get() = t("German", "Deutsch")
     val startOnBoot get() = t("Start on boot", "Beim Booten starten")
     val adminPin get() = t("Admin PIN (access to settings)", "Admin-PIN (Zugang zu Einstellungen)")
+    val permissionsTitle get() = t("Permissions", "Berechtigungen")
+    val enableDeviceAdmin get() = t("Enable device admin (screen lock)", "Geräteadmin aktivieren (Sperren)")
+    val allowBrightness get() = t("Allow brightness control", "Helligkeitssteuerung erlauben")
+    val setAsHomeApp get() = t("Set as Home app (autostart)", "Als Home-App festlegen (Autostart)")
 
     // Hilfe / Über
     val help get() = t("Help", "Hilfe")

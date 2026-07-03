@@ -1,6 +1,7 @@
 package de.kewl.fullscreendy
 
 import android.Manifest
+import android.app.KeyguardManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -95,6 +96,26 @@ class MainActivity : ComponentActivity() {
         if (hasFocus) hideSystemBars()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Im Vordergrund: Kamera/Mikrofon-Detektoren (neu) starten – im Hintergrund
+        // ist das oft blockiert.
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, KioskService::class.java).setAction(KioskService.ACTION_REFRESH)
+        )
+    }
+
+    /** Bildschirm wecken und unsicheren Sperrbildschirm lösen (soweit möglich). */
+    fun unlockDevice() {
+        runCatching {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+            window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
+            getSystemService(KeyguardManager::class.java)?.requestDismissKeyguard(this, null)
+        }
+    }
+
     private fun hideSystemBars() {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
         controller.hide(WindowInsetsCompat.Type.systemBars())
@@ -103,7 +124,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestPermissions() {
-        val needed = mutableListOf(Manifest.permission.CAMERA)
+        val needed = mutableListOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             needed += Manifest.permission.POST_NOTIFICATIONS
         }
@@ -131,7 +152,14 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun KioskRoot(repo: SettingsRepository) {
-        val settings by repo.settings.collectAsState(initial = Settings())
+        // WICHTIG: erst auf die echten, gespeicherten Werte warten (initial = null).
+        // Sonst zeigt der erste Frame leere Defaults und ein Zurück/Speichern könnte
+        // die gespeicherten Einstellungen überschreiben.
+        val settings = repo.settings.collectAsState(initial = null).value
+        if (settings == null) {
+            Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {}
+            return
+        }
         val strings = remember(settings.language) { Strings(AppLang.from(settings.language)) }
 
         CompositionLocalProvider(LocalStrings provides strings) {
@@ -167,6 +195,7 @@ class MainActivity : ComponentActivity() {
                     KioskCommand.ClearCache -> webController.clearCache()
                     is KioskCommand.Screen -> overlayVisible = !cmd.on
                     is KioskCommand.Brightness -> brightness = cmd.level
+                    KioskCommand.Unlock -> unlockDevice()
                 }
             }
         }

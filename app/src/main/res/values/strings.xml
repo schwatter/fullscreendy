@@ -5,4 +5,5 @@
     <string name="notif_channel_desc">Keeps the connection to FHEM alive.</string>
     <string name="notif_title">FullScreendy running</string>
     <string name="notif_text">Connected to the dashboard and MQTT.</string>
+    <string name="admin_desc">Allows FullScreendy to lock the screen via MQTT.</string>
 </resources>

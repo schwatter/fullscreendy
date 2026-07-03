@@ -20,8 +20,12 @@ import kotlin.math.abs
  */
 class MotionDetector(
     private val context: Context,
+    sensitivity: Int,
     private val onMotionChanged: (active: Boolean) -> Unit,
 ) {
+    // Empfindlichkeit 0..100 → Schwelle 8.0 (unempfindlich) .. 0.5 (sehr empfindlich).
+    private val threshold = (8.0 - sensitivity.coerceIn(0, 100) * 0.075).coerceIn(0.5, 8.0)
+
     private val analysisExecutor = Executors.newSingleThreadExecutor()
     private val timer: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     private var provider: ProcessCameraProvider? = null
@@ -64,7 +68,7 @@ class MotionDetector(
             val luma = averageLuma(image)
             if (previousLuma >= 0) {
                 val diff = abs(luma - previousLuma)
-                if (diff > THRESHOLD) {
+                if (diff > threshold) {
                     lastMotionAt = System.currentTimeMillis()
                     if (!active) {
                         active = true
@@ -106,8 +110,6 @@ class MotionDetector(
 
     companion object {
         private const val TAG = "MotionDetector"
-        /** Empfindlichkeit: kleinere Werte = empfindlicher. */
-        private const val THRESHOLD = 4.0
         /** Nach so vielen ms ohne Bewegung gilt der Zustand als "inaktiv". */
         private const val QUIET_MILLIS = 15_000L
         /** Nur jedes n-te Byte auswerten (Performance). */

@@ -13,7 +13,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -29,9 +31,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import android.content.Intent
 import de.kewl.fullscreendy.data.Settings
+import de.kewl.fullscreendy.device.SystemController
 import de.kewl.fullscreendy.i18n.LocalStrings
 import de.kewl.fullscreendy.i18n.Strings
+import kotlin.math.roundToInt
 
 private enum class Section { Home, Connection, Display, Behavior, Sounds, System }
 
@@ -172,8 +177,19 @@ private fun DisplaySection(draft: Settings, s: Strings, onChange: (Settings) -> 
 @Composable
 private fun BehaviorSection(draft: Settings, s: Strings, onChange: (Settings) -> Unit) {
     SwitchRow(s.motionDetection, draft.motionEnabled) { onChange(draft.copy(motionEnabled = it)) }
-    SwitchRow(s.motionWakesScreen, draft.motionWakesScreen) {
-        onChange(draft.copy(motionWakesScreen = it))
+    if (draft.motionEnabled) {
+        SwitchRow(s.motionWakesScreen, draft.motionWakesScreen) {
+            onChange(draft.copy(motionWakesScreen = it))
+        }
+        SliderRow(s.motionSensitivity, draft.motionSensitivity) {
+            onChange(draft.copy(motionSensitivity = it))
+        }
+    }
+    SwitchRow(s.soundWake, draft.soundWakeEnabled) { onChange(draft.copy(soundWakeEnabled = it)) }
+    if (draft.soundWakeEnabled) {
+        SliderRow(s.soundSensitivity, draft.soundSensitivity) {
+            onChange(draft.copy(soundSensitivity = it))
+        }
     }
     SwitchRow(s.pullToRefresh, draft.pullToRefresh) { onChange(draft.copy(pullToRefresh = it)) }
     SwitchRow(s.ttsEnabled, draft.ttsEnabled) { onChange(draft.copy(ttsEnabled = it)) }
@@ -216,6 +232,43 @@ private fun SystemSection(draft: Settings, s: Strings, onChange: (Settings) -> U
         visualTransformation = PasswordVisualTransformation(),
         modifier = Modifier.fillMaxWidth()
     )
+
+    HorizontalDivider()
+    Text(s.permissionsTitle, style = MaterialTheme.typography.titleMedium)
+    val context = LocalContext.current
+    fun open(intent: Intent) {
+        runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+    }
+    OutlinedButton(
+        onClick = { open(SystemController.deviceAdminIntent(context)) },
+        modifier = Modifier.fillMaxWidth()
+    ) { Text(s.enableDeviceAdmin) }
+    OutlinedButton(
+        onClick = { open(SystemController.writeSettingsIntent(context)) },
+        modifier = Modifier.fillMaxWidth()
+    ) { Text(s.allowBrightness) }
+    OutlinedButton(
+        onClick = { open(SystemController.homeSettingsIntent()) },
+        modifier = Modifier.fillMaxWidth()
+    ) { Text(s.setAsHomeApp) }
+}
+
+@Composable
+private fun SliderRow(label: String, value: Int, onChange: (Int) -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyLarge)
+            Text("$value", style = MaterialTheme.typography.bodyLarge)
+        }
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onChange(it.roundToInt()) },
+            valueRange = 0f..100f
+        )
+    }
 }
 
 @Composable

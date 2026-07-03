@@ -26,6 +26,9 @@ class SettingsRepository(private val context: Context) {
         val DEVICE_ID = stringPreferencesKey("device_id")
         val MOTION_ENABLED = booleanPreferencesKey("motion_enabled")
         val MOTION_WAKES = booleanPreferencesKey("motion_wakes_screen")
+        val MOTION_SENS = intPreferencesKey("motion_sensitivity")
+        val SOUND_WAKE = booleanPreferencesKey("sound_wake_enabled")
+        val SOUND_SENS = intPreferencesKey("sound_sensitivity")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
         val IGNORE_FONT_SCALE = booleanPreferencesKey("ignore_font_scale")
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
@@ -50,6 +53,9 @@ class SettingsRepository(private val context: Context) {
             deviceId = p[Keys.DEVICE_ID] ?: defaults.deviceId,
             motionEnabled = p[Keys.MOTION_ENABLED] ?: defaults.motionEnabled,
             motionWakesScreen = p[Keys.MOTION_WAKES] ?: defaults.motionWakesScreen,
+            motionSensitivity = p[Keys.MOTION_SENS] ?: defaults.motionSensitivity,
+            soundWakeEnabled = p[Keys.SOUND_WAKE] ?: defaults.soundWakeEnabled,
+            soundSensitivity = p[Keys.SOUND_SENS] ?: defaults.soundSensitivity,
             keepScreenOn = p[Keys.KEEP_SCREEN_ON] ?: defaults.keepScreenOn,
             ignoreSystemFontScale = p[Keys.IGNORE_FONT_SCALE] ?: defaults.ignoreSystemFontScale,
             ttsEnabled = p[Keys.TTS_ENABLED] ?: defaults.ttsEnabled,
@@ -74,6 +80,9 @@ class SettingsRepository(private val context: Context) {
             p[Keys.DEVICE_ID] = s.deviceId
             p[Keys.MOTION_ENABLED] = s.motionEnabled
             p[Keys.MOTION_WAKES] = s.motionWakesScreen
+            p[Keys.MOTION_SENS] = s.motionSensitivity
+            p[Keys.SOUND_WAKE] = s.soundWakeEnabled
+            p[Keys.SOUND_SENS] = s.soundSensitivity
             p[Keys.KEEP_SCREEN_ON] = s.keepScreenOn
             p[Keys.IGNORE_FONT_SCALE] = s.ignoreSystemFontScale
             p[Keys.TTS_ENABLED] = s.ttsEnabled

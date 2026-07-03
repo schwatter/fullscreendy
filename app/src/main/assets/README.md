@@ -89,9 +89,11 @@ Basis: `<Basis-Topic>/<Geräte-ID>`, im Beispiel `fhem/tablet/tablet1`.
 | `cmd/url` | URL | lädt eine andere Seite und meldet sie als `url`-Reading |
 | `cmd/reload` | (egal) | lädt die Seite neu |
 | `cmd/clearcache` | (egal) | leert den Browser-Cache |
-| `cmd/screen` | `on` / `off` | Bildschirm an / schwarzes Overlay |
+| `cmd/screen` | `on` / `off` | weckt das Display physisch (an) bzw. schwarzes Overlay (aus) |
 | `cmd/screensaver` | `on` / `off` | wie `screen`, invertiert |
-| `cmd/brightness` | `0`–`100` oder `auto` | Helligkeit |
+| `cmd/brightness` | `0`–`100` oder `auto` | Helligkeit (voller Bereich mit „Helligkeitssteuerung erlauben") |
+| `cmd/lock` | (egal) | sperrt den Bildschirm (benötigt Geräteadmin) |
+| `cmd/unlock` | (egal) | weckt & löst den (unsicheren) Sperrbildschirm |
 
 **Töne:** Dateien in den Sound-Ordner des Geräts kopieren (Pfad steht in der App
 unter *Einstellungen → Töne*, typ. `/sdcard/Android/data/de.kewl.fullscreendy/files/sounds/`),
@@ -130,6 +132,8 @@ attr tablet1 setList \
   screenOff:noArg  fhem/tablet/tablet1/cmd/screen off \
   reload:noArg     fhem/tablet/tablet1/cmd/reload 1 \
   clearCache:noArg fhem/tablet/tablet1/cmd/clearcache 1 \
+  lock:noArg       fhem/tablet/tablet1/cmd/lock 1 \
+  unlock:noArg     fhem/tablet/tablet1/cmd/unlock 1 \
   mediaStop:noArg  fhem/tablet/tablet1/cmd/mediastop 1 \
   brightness:slider,0,1,100 fhem/tablet/tablet1/cmd/brightness $EVTPART1 \
   url:textField       fhem/tablet/tablet1/cmd/url $EVTPART1 \
@@ -165,6 +169,22 @@ set MQTT2_Broker publish fhem/tablet/tablet1/cmd/mediaplay tuerklingel.mp3
 
 ---
 
+## Geräte-Einstellungen & Berechtigungen (v0.3)
+
+Unter *Einstellungen → Verhalten*:
+- **Bewegungs-Empfindlichkeit** (Schieberegler) für die Kamera-Erkennung.
+- **Wecken bei Ton (Mikrofon)** mit **Ton-Empfindlichkeit** – lauter Umgebungsschall
+  weckt das Display (nur Lautstärke, keine Aufnahme).
+
+Unter *Einstellungen → Anzeige*:
+- **Bildschirm immer an** ist jetzt **standardmäßig aus**.
+
+Unter *Einstellungen → System → Berechtigungen* (einmalig erteilen):
+- **Geräteadmin aktivieren** → nötig für `cmd/lock`.
+- **Helligkeitssteuerung erlauben** (WRITE_SETTINGS) → echte Hardware-Helligkeit
+  über den vollen Bereich (behebt „nur bis ~60 %").
+- **Als Home-App festlegen** → zuverlässiger Autostart nach dem Booten.
+
 ## Architektur (Kurzüberblick)
 
 ```
@@ -183,13 +203,15 @@ Einstellungen liegen in Jetpack DataStore; alle Topics werden daraus abgeleitet.
 ---
 
 ## Bekannte Grenzen / To-do
-- „Bildschirm aus“ ist ein schwarzes Overlay + Helligkeit 0. Echtes Abschalten
-  des Panels bräuchte einen **Device-Admin/DeviceOwner** (`lockNow`) – bewusst
-  noch nicht drin.
-- Der Foreground-Service nutzt Typ `dataSync`; unter Android 15 gibt es dafür
-  Laufzeit-Limits. Für 24/7 ggf. auf `specialUse`/DeviceOwner umstellen.
-- Bewegungserkennung ist eine einfache Helligkeitsdifferenz (Schwellwert in
-  `MotionDetector.THRESHOLD`), robust genug für Anwesenheit, kein Personen-Tracking.
+- `cmd/unlock` weckt und löst nur einen **unsicheren** Sperrbildschirm; eine
+  gesicherte PIN/Muster kann aus Sicherheitsgründen nicht umgangen werden.
+- **Bewegungs-/Ton-Weckung** brauchen Kamera/Mikrofon im Vordergrund (Kiosk-Fall).
+  Startet das Display per Zeitüberschreitung komplett durch, wecke lieber per
+  `cmd/screen on` (Wakelock) – das funktioniert immer.
+- Kamera/Mikrofon starten nur, wenn die App im Vordergrund war; nach reinem
+  Boot ohne Öffnen bleiben sie aus (Android-Hintergrund-Restriktion).
+- Autostart nach Boot ist ohne **Home-App/OEM-Autostart** unzuverlässig
+  (Android blockiert Hintergrund-Activity-Starts).
 - TLS nutzt den System-Truststore; selbstsignierte Broker-Zertifikate müssten
   ergänzt werden.
 - `cmd/volume` (Lautstärke für TTS/Media) ist noch nicht umgesetzt.

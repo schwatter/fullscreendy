@@ -16,6 +16,9 @@ sealed interface KioskCommand {
 
     /** Browser-Cache leeren. */
     data object ClearCache : KioskCommand
+
+    /** Bildschirm wecken und (unsicheren) Sperrbildschirm lösen. */
+    data object Unlock : KioskCommand
 }
 
 /**

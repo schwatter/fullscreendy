@@ -4,4 +4,5 @@
     <string name="notif_channel_desc">Hält die Verbindung zu FHEM aufrecht.</string>
     <string name="notif_title">FullScreendy aktiv</string>
     <string name="notif_text">Verbunden mit dem Dashboard und MQTT.</string>
+    <string name="admin_desc">Erlaubt FullScreendy, den Bildschirm per MQTT zu sperren.</string>
 </resources>
