@@ -95,10 +95,10 @@ Basis: `<Basis-Topic>/<Geräte-ID>`, im Beispiel `fhem/tablet/tablet1`.
 | `cmd/lock` | (egal) | sperrt den Bildschirm (benötigt Geräteadmin) |
 | `cmd/unlock` | (egal) | weckt & löst den (unsicheren) Sperrbildschirm |
 
-**Töne:** Dateien in den Sound-Ordner des Geräts kopieren (Pfad steht in der App
-unter *Einstellungen → Töne*, typ. `/sdcard/Android/data/de.kewl.fullscreendy/files/sounds/`),
-dann per `cmd/mediaplay` mit relativem Pfad abspielen. `http…`-URLs werden gestreamt,
-Pfade mit `/` als absolute Datei behandelt.
+**Töne:** Dateien in den öffentlichen Ordner **`/sdcard/FullScreendy/`** kopieren
+(über Dateimanager/USB erreichbar). Vorher einmalig **Einstellungen → System →
+„Dateizugriff erlauben"** erteilen. Dann per `cmd/mediaplay ding.mp3` abspielen.
+`http…`-URLs werden gestreamt, Pfade mit `/` als absolute Datei behandelt.
 
 ---
 
@@ -183,6 +183,8 @@ Unter *Einstellungen → System → Berechtigungen* (einmalig erteilen):
 - **Geräteadmin aktivieren** → nötig für `cmd/lock`.
 - **Helligkeitssteuerung erlauben** (WRITE_SETTINGS) → echte Hardware-Helligkeit
   über den vollen Bereich (behebt „nur bis ~60 %").
+- **Dateizugriff erlauben** (All-Files-Access) → damit die App Tondateien aus
+  `/sdcard/FullScreendy/` lesen kann.
 - **Als Home-App festlegen** → zuverlässiger Autostart nach dem Booten.
 
 ## Architektur (Kurzüberblick)

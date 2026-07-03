@@ -5,6 +5,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
 import android.provider.Settings
 import de.kewl.fullscreendy.AdminReceiver
 
@@ -51,6 +53,24 @@ object SystemController {
         Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${ctx.packageName}"))
 
     fun homeSettingsIntent(): Intent = Intent(Settings.ACTION_HOME_SETTINGS)
+
+    /** true, wenn die App beliebige Dateien lesen darf (für den Sound-Ordner). */
+    fun hasAllFilesAccess(): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Environment.isExternalStorageManager()
+        else true // < Android 11: klassische Speicherberechtigung genügt
+
+    fun allFilesAccessIntent(ctx: Context): Intent =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Intent(
+                Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                Uri.parse("package:${ctx.packageName}")
+            )
+        } else {
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:${ctx.packageName}")
+            )
+        }
 
     fun deviceAdminIntent(ctx: Context): Intent =
         Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)

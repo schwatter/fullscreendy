@@ -78,8 +78,10 @@ class Strings(private val lang: AppLang) {
 
     // Töne
     val soundsHint get() = t(
-        "Copy sound files into this folder, then play via MQTT (e.g. cmd/mediaplay = alarm/ding.mp3):",
-        "Tondateien in diesen Ordner kopieren, dann per MQTT abspielen (z. B. cmd/mediaplay = alarm/ding.mp3):"
+        "Copy sound files into this folder (grant 'Allow file access' under System first), " +
+            "then play via MQTT (e.g. cmd/mediaplay = ding.mp3):",
+        "Tondateien in diesen Ordner kopieren (vorher unter System 'Dateizugriff erlauben'), " +
+            "dann per MQTT abspielen (z. B. cmd/mediaplay = ding.mp3):"
     )
 
     // System
@@ -91,6 +93,7 @@ class Strings(private val lang: AppLang) {
     val permissionsTitle get() = t("Permissions", "Berechtigungen")
     val enableDeviceAdmin get() = t("Enable device admin (screen lock)", "Geräteadmin aktivieren (Sperren)")
     val allowBrightness get() = t("Allow brightness control", "Helligkeitssteuerung erlauben")
+    val allowFileAccess get() = t("Allow file access (sounds)", "Dateizugriff erlauben (Töne)")
     val setAsHomeApp get() = t("Set as Home app (autostart)", "Als Home-App festlegen (Autostart)")
 
     // Hilfe / Über

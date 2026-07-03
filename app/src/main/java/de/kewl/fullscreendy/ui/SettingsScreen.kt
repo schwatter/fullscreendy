@@ -32,10 +32,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import android.content.Intent
+import android.os.Environment
 import de.kewl.fullscreendy.data.Settings
 import de.kewl.fullscreendy.device.SystemController
 import de.kewl.fullscreendy.i18n.LocalStrings
 import de.kewl.fullscreendy.i18n.Strings
+import java.io.File
 import kotlin.math.roundToInt
 
 private enum class Section { Home, Connection, Display, Behavior, Sounds, System }
@@ -198,9 +200,9 @@ private fun BehaviorSection(draft: Settings, s: Strings, onChange: (Settings) ->
 
 @Composable
 private fun SoundsSection(s: Strings) {
-    val context = LocalContext.current
-    val soundsPath = remember(context) {
-        context.getExternalFilesDir("sounds")?.absolutePath ?: "—"
+    val soundsPath = remember {
+        @Suppress("DEPRECATION")
+        File(Environment.getExternalStorageDirectory(), "FullScreendy").absolutePath
     }
     Text(s.soundsHint, style = MaterialTheme.typography.bodyMedium)
     Text(soundsPath, style = MaterialTheme.typography.bodySmall)
@@ -247,6 +249,10 @@ private fun SystemSection(draft: Settings, s: Strings, onChange: (Settings) -> U
         onClick = { open(SystemController.writeSettingsIntent(context)) },
         modifier = Modifier.fillMaxWidth()
     ) { Text(s.allowBrightness) }
+    OutlinedButton(
+        onClick = { open(SystemController.allFilesAccessIntent(context)) },
+        modifier = Modifier.fillMaxWidth()
+    ) { Text(s.allowFileAccess) }
     OutlinedButton(
         onClick = { open(SystemController.homeSettingsIntent()) },
         modifier = Modifier.fillMaxWidth()
