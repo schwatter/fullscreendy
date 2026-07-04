@@ -27,8 +27,8 @@ class Strings(private val lang: AppLang) {
     val navClearCache get() = t("Clear cache", "Cache leeren")
     val navScreenOff get() = t("Screen off", "Bildschirm aus")
     val navSettings get() = t("Settings", "Einstellungen")
-    val navHelp get() = t("Help", "Hilfe")
     val navAbout get() = t("About", "Über")
+    val navExit get() = t("Exit app", "App beenden")
 
     // Allgemein
     val save get() = t("Save", "Speichern")
@@ -72,6 +72,12 @@ class Strings(private val lang: AppLang) {
     val motionSensitivity get() = t("Motion sensitivity", "Bewegungs-Empfindlichkeit")
     val soundWake get() = t("Wake on sound (microphone)", "Wecken bei Ton (Mikrofon)")
     val soundSensitivity get() = t("Sound sensitivity", "Ton-Empfindlichkeit")
+    val motionTest get() = t("Motion test", "Bewegungs-Test")
+    val soundTest get() = t("Sound test", "Ton-Test")
+    val testHint get() = t(
+        "Save first, then wave at the camera / make a noise – the dot lights up and the device vibrates on detection.",
+        "Erst speichern, dann vor der Kamera winken / Geräusch machen – der Punkt leuchtet und das Gerät vibriert bei Erkennung."
+    )
     val pullToRefresh get() = t("Pull down to reload", "Zum Aktualisieren nach unten ziehen")
     val ttsEnabled get() = t("Text-to-speech enabled", "Text-to-Speech aktiv")
     val mediaEnabled get() = t("Sound playback enabled", "Tonwiedergabe aktiv")
@@ -92,13 +98,14 @@ class Strings(private val lang: AppLang) {
     val adminPin get() = t("Admin PIN (access to settings)", "Admin-PIN (Zugang zu Einstellungen)")
     val permissionsTitle get() = t("Permissions", "Berechtigungen")
     val enableDeviceAdmin get() = t("Enable device admin (screen lock)", "Geräteadmin aktivieren (Sperren)")
+    val adminActive get() = t("Device admin active ✓", "Geräteadmin aktiv ✓")
     val allowBrightness get() = t("Allow brightness control", "Helligkeitssteuerung erlauben")
     val allowFileAccess get() = t("Allow file access (sounds)", "Dateizugriff erlauben (Töne)")
-    val setAsHomeApp get() = t("Set as Home app (autostart)", "Als Home-App festlegen (Autostart)")
+    val openFailed get() = t("Could not open system settings", "Systemeinstellungen konnten nicht geöffnet werden")
 
-    // Hilfe / Über
-    val help get() = t("Help", "Hilfe")
+    // Über
     val about get() = t("About", "Über")
+    val githubRepo get() = t("Project on GitHub ↗", "Projekt auf GitHub ↗")
     val appVersionLabel get() = t("App version", "App-Version")
     val androidVersionLabel get() = t("Android version", "Android-Version")
     val ipAddressLabel get() = t("IP address", "IP-Adresse")

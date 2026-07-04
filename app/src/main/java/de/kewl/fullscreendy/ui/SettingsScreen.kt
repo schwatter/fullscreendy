@@ -1,12 +1,18 @@
 package de.kewl.fullscreendy.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -21,22 +27,33 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import android.content.Intent
 import android.os.Environment
+import android.widget.Toast
 import de.kewl.fullscreendy.data.Settings
 import de.kewl.fullscreendy.device.SystemController
 import de.kewl.fullscreendy.i18n.LocalStrings
 import de.kewl.fullscreendy.i18n.Strings
+import de.kewl.fullscreendy.kiosk.KioskStatus
+import kotlinx.coroutines.delay
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -196,6 +213,50 @@ private fun BehaviorSection(draft: Settings, s: Strings, onChange: (Settings) ->
     SwitchRow(s.pullToRefresh, draft.pullToRefresh) { onChange(draft.copy(pullToRefresh = it)) }
     SwitchRow(s.ttsEnabled, draft.ttsEnabled) { onChange(draft.copy(ttsEnabled = it)) }
     SwitchRow(s.mediaEnabled, draft.mediaEnabled) { onChange(draft.copy(mediaEnabled = it)) }
+
+    if (draft.motionEnabled || draft.soundWakeEnabled) {
+        HorizontalDivider()
+        Text(s.testHint, style = MaterialTheme.typography.bodySmall)
+        val context = LocalContext.current
+
+        if (draft.motionEnabled) {
+            val motionActive by KioskStatus.motionActive.collectAsState()
+            LaunchedEffect(motionActive) {
+                if (motionActive) SystemController.vibrate(context, 100)
+            }
+            IndicatorRow(s.motionTest, motionActive)
+        }
+        if (draft.soundWakeEnabled) {
+            val soundAt by KioskStatus.soundAt.collectAsState()
+            var soundFlash by remember { mutableStateOf(false) }
+            LaunchedEffect(soundAt) {
+                if (soundAt > 0) {
+                    SystemController.vibrate(context, 100)
+                    soundFlash = true
+                    delay(1500)
+                    soundFlash = false
+                }
+            }
+            IndicatorRow(s.soundTest, soundFlash)
+        }
+    }
+}
+
+@Composable
+private fun IndicatorRow(label: String, active: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(16.dp)
+                .clip(CircleShape)
+                .background(if (active) Color(0xFF4CAF50) else Color(0xFF9E9E9E))
+        )
+        Spacer(Modifier.width(12.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+    }
 }
 
 @Composable
@@ -238,13 +299,41 @@ private fun SystemSection(draft: Settings, s: Strings, onChange: (Settings) -> U
     HorizontalDivider()
     Text(s.permissionsTitle, style = MaterialTheme.typography.titleMedium)
     val context = LocalContext.current
-    fun open(intent: Intent) {
-        runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+
+    // Admin-Status live aktualisieren, wenn man aus den System-Einstellungen zurückkehrt.
+    var adminActive by remember { mutableStateOf(SystemController.isAdminActive(context)) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                adminActive = SystemController.isAdminActive(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+
+    fun open(intent: Intent, fallback: Intent? = null) {
+        val ok = runCatching {
+            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.isSuccess
+        if (!ok) {
+            val fbOk = fallback != null && runCatching {
+                context.startActivity(fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }.isSuccess
+            if (!fbOk) Toast.makeText(context, s.openFailed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     OutlinedButton(
-        onClick = { open(SystemController.deviceAdminIntent(context)) },
+        onClick = {
+            open(
+                SystemController.deviceAdminIntent(context),
+                fallback = SystemController.securitySettingsIntent()
+            )
+        },
         modifier = Modifier.fillMaxWidth()
-    ) { Text(s.enableDeviceAdmin) }
+    ) { Text(if (adminActive) s.adminActive else s.enableDeviceAdmin) }
     OutlinedButton(
         onClick = { open(SystemController.writeSettingsIntent(context)) },
         modifier = Modifier.fillMaxWidth()
@@ -253,10 +342,6 @@ private fun SystemSection(draft: Settings, s: Strings, onChange: (Settings) -> U
         onClick = { open(SystemController.allFilesAccessIntent(context)) },
         modifier = Modifier.fillMaxWidth()
     ) { Text(s.allowFileAccess) }
-    OutlinedButton(
-        onClick = { open(SystemController.homeSettingsIntent()) },
-        modifier = Modifier.fillMaxWidth()
-    ) { Text(s.setAsHomeApp) }
 }
 
 @Composable

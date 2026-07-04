@@ -9,7 +9,7 @@ FHEM-Dashboard anzeigt und das Tablet über **MQTT** als FHEM-Gerät anbindet.
 - 🖥️ **Bildschirm-Steuerung** – an/aus (Overlay) und Helligkeit
 - 🚶 **Präsenz / Bewegung** – Kamera-Bewegungserkennung, weckt das Display (kein Bild verlässt das Gerät)
 - 🌐 **Fernsteuerung** – URL wechseln, neu laden, Cache leeren – alles per MQTT
-- 🗂️ **Menü** – von links einwischen: Status, Aktionen, Einstellungen (PIN), Hilfe, Über
+- 🗂️ **Menü** – von links einwischen: Status, Aktionen, Einstellungen (PIN), Über, App beenden
 - 🌍 **Zweisprachig** – Englisch (Standard) / Deutsch
 
 Alles läuft in einem dauerhaften Foreground-Service mit Auto-Reconnect zum MQTT-Broker.
@@ -47,13 +47,14 @@ Kamera- und Benachrichtigungs-Berechtigung beim ersten Start erlauben.
 
 **Menü / zurück in die Einstellungen:** vom **linken Bildschirmrand nach rechts
 wischen** → Menü mit MQTT-Status, *Neu laden*, *Cache leeren*, *Bildschirm aus*,
-*Einstellungen* (PIN), *Hilfe*, *Über*.
+*Einstellungen* (PIN), *Über* (mit GitHub-Link), *App beenden*.
 
-### Als echter Kiosk (optional)
-- App als **Standard-Home-App** setzen (Einstellungen → Apps → Standard-Apps →
-  Start-App). Dann startet sie nach dem Booten automatisch (sofern *Autostart*
-  aktiv ist) und der Home-Button bleibt in der App.
-- Für Vollverriegelung ggf. Android **Screen Pinning** aktivieren.
+### Autostart (optional)
+Die App ist bewusst **kein Launcher/Home-Ersatz** – das Tablet bleibt normal
+bedienbar. Für Autostart nach dem Booten: *Einstellungen → System → „Beim Booten
+starten“* aktivieren. Auf manchen Geräten (Xiaomi, Huawei, …) zusätzlich in den
+Android-Einstellungen den **OEM-Autostart** für FullScreendy erlauben. Für
+Vollverriegelung ggf. Android **Screen Pinning** nutzen.
 
 ---
 
@@ -94,6 +95,7 @@ Basis: `<Basis-Topic>/<Geräte-ID>`, im Beispiel `fhem/tablet/tablet1`.
 | `cmd/brightness` | `0`–`100` oder `auto` | Helligkeit (voller Bereich mit „Helligkeitssteuerung erlauben") |
 | `cmd/lock` | (egal) | sperrt den Bildschirm (benötigt Geräteadmin) |
 | `cmd/unlock` | (egal) | weckt & löst den (unsicheren) Sperrbildschirm |
+| `cmd/vibrate` | Dauer in ms (leer = 200) | Vibrations-Feedback, max. 5000 ms |
 
 **Töne:** Dateien in den öffentlichen Ordner **`/sdcard/FullScreendy/`** kopieren
 (über Dateimanager/USB erreichbar). Vorher einmalig **Einstellungen → System →
@@ -175,6 +177,9 @@ Unter *Einstellungen → Verhalten*:
 - **Bewegungs-Empfindlichkeit** (Schieberegler) für die Kamera-Erkennung.
 - **Wecken bei Ton (Mikrofon)** mit **Ton-Empfindlichkeit** – lauter Umgebungsschall
   weckt das Display (nur Lautstärke, keine Aufnahme).
+- **Test-Indikatoren**: bei aktivierter Bewegungs-/Ton-Erkennung zeigen grüne
+  Punkte live jede Erkennung an (das Gerät vibriert dabei kurz). Erst speichern,
+  dann winken bzw. Geräusch machen.
 
 Unter *Einstellungen → Anzeige*:
 - **Bildschirm immer an** ist jetzt **standardmäßig aus**.
@@ -185,7 +190,10 @@ Unter *Einstellungen → System → Berechtigungen* (einmalig erteilen):
   über den vollen Bereich (behebt „nur bis ~60 %").
 - **Dateizugriff erlauben** (All-Files-Access) → damit die App Tondateien aus
   `/sdcard/FullScreendy/` lesen kann.
-- **Als Home-App festlegen** → zuverlässiger Autostart nach dem Booten.
+
+Der Geräteadmin-Button zeigt den aktuellen Status („Geräteadmin aktiv ✓“) und
+öffnet zur Not die Sicherheits-Einstellungen, falls der direkte Dialog auf dem
+Gerät nicht verfügbar ist.
 
 ## Architektur (Kurzüberblick)
 
@@ -212,8 +220,8 @@ Einstellungen liegen in Jetpack DataStore; alle Topics werden daraus abgeleitet.
   `cmd/screen on` (Wakelock) – das funktioniert immer.
 - Kamera/Mikrofon starten nur, wenn die App im Vordergrund war; nach reinem
   Boot ohne Öffnen bleiben sie aus (Android-Hintergrund-Restriktion).
-- Autostart nach Boot ist ohne **Home-App/OEM-Autostart** unzuverlässig
-  (Android blockiert Hintergrund-Activity-Starts).
+- Autostart nach Boot ist je nach Hersteller unzuverlässig (Android blockiert
+  Hintergrund-Activity-Starts) – ggf. **OEM-Autostart** für die App erlauben.
 - TLS nutzt den System-Truststore; selbstsignierte Broker-Zertifikate müssten
   ergänzt werden.
 - `cmd/volume` (Lautstärke für TTS/Media) ist noch nicht umgesetzt.

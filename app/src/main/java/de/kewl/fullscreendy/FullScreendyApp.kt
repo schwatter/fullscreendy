@@ -5,7 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 
-class FhemKioskApp : Application() {
+class FullScreendyApp : Application() {
 
     override fun onCreate() {
         super.onCreate()

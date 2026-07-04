@@ -7,6 +7,9 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.Settings
 import de.kewl.fullscreendy.AdminReceiver
 
@@ -33,6 +36,20 @@ object SystemController {
 
     fun canWriteSettings(ctx: Context): Boolean = Settings.System.canWrite(ctx)
 
+    /** Vibriert für [ms] Millisekunden (1..5000). Für haptisches Feedback per MQTT. */
+    @Suppress("DEPRECATION")
+    fun vibrate(ctx: Context, ms: Long) {
+        val duration = ms.coerceIn(1, 5000)
+        val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ctx.getSystemService(VibratorManager::class.java)?.defaultVibrator
+        } else {
+            ctx.getSystemService(Vibrator::class.java)
+        } ?: return
+        runCatching {
+            vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
+        }
+    }
+
     /** Setzt die echte Geräte-Helligkeit (0..100 → 0..255). true bei Erfolg. */
     fun setSystemBrightness(ctx: Context, percent: Int): Boolean {
         if (!Settings.System.canWrite(ctx)) return false
@@ -52,7 +69,8 @@ object SystemController {
     fun writeSettingsIntent(ctx: Context): Intent =
         Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:${ctx.packageName}"))
 
-    fun homeSettingsIntent(): Intent = Intent(Settings.ACTION_HOME_SETTINGS)
+    /** Fallback, falls der direkte Geräteadmin-Dialog nicht verfügbar ist. */
+    fun securitySettingsIntent(): Intent = Intent(Settings.ACTION_SECURITY_SETTINGS)
 
     /** true, wenn die App beliebige Dateien lesen darf (für den Sound-Ordner). */
     fun hasAllFilesAccess(): Boolean =

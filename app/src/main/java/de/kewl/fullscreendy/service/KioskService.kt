@@ -13,7 +13,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
-import de.kewl.fullscreendy.FhemKioskApp
+import de.kewl.fullscreendy.FullScreendyApp
 import de.kewl.fullscreendy.MainActivity
 import de.kewl.fullscreendy.R
 import de.kewl.fullscreendy.data.Settings
@@ -33,6 +33,7 @@ import de.kewl.fullscreendy.mqtt.MqttConfig
 import de.kewl.fullscreendy.mqtt.MqttManager
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 /**
  * Dauerhaft laufender Dienst: hält die MQTT-Verbindung zu FHEM, meldet Akku- und
@@ -54,6 +55,10 @@ class KioskService : LifecycleService() {
     private var screenOn: Boolean = true
     private var currentUrl: String = ""
     private var brightnessPercent: Int = -1 // -1 = auto
+
+    // Verhindert unnötige Neustarts von MQTT/Detektoren bei irrelevanten Änderungen.
+    private var mqttKey: String? = null
+    private var detectorKey: String? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -86,20 +91,32 @@ class KioskService : LifecycleService() {
     // ---- Konfiguration anwenden -------------------------------------------------
 
     private fun applySettings(s: Settings) {
-        currentUrl = s.dashboardUrl
+        if (currentUrl != s.dashboardUrl) {
+            currentUrl = s.dashboardUrl
+            publishUrl()
+        }
 
         // Batteriemonitor (immer aktiv)
         if (battery == null) {
             battery = BatteryMonitor(applicationContext) { state -> onBattery(state) }.also { it.start() }
         }
 
-        // Detektoren neu aufsetzen (damit u. a. die Empfindlichkeit greift).
-        motion?.stop(); motion = null
-        sound?.stop(); sound = null
+        // Detektoren nur neu aufsetzen, wenn sich ihre Konfiguration geändert hat.
+        val dk = "${s.motionEnabled}|${s.motionSensitivity}|${s.soundWakeEnabled}|${s.soundSensitivity}"
+        if (dk != detectorKey) {
+            detectorKey = dk
+            motion?.stop(); motion = null
+            sound?.stop(); sound = null
+            KioskStatus.setMotionActive(false)
+        }
         startDetectors(s)
 
-        // MQTT neu verbinden
-        connectMqtt(s)
+        // MQTT nur neu verbinden, wenn sich die Verbindungsdaten geändert haben.
+        val mk = "${s.mqttHost}|${s.mqttPort}|${s.mqttTls}|${s.mqttUser}|${s.mqttPass}|${s.deviceTopic}"
+        if (mk != mqttKey) {
+            mqttKey = mk
+            connectMqtt(s)
+        }
     }
 
     private fun granted(perm: String) =
@@ -196,11 +213,13 @@ class KioskService : LifecycleService() {
             publish("$dt/battery", state.level.toString(), retained = true)
             publish("$dt/charging", if (state.charging) "on" else "off", retained = true)
             publish("$dt/plug", state.plugged, retained = true)
-            publish("$dt/batteryTemp", "%.1f".format(state.temperatureC), retained = true)
+            // Locale.US erzwingt Punkt als Dezimaltrenner (sonst "24,5" bei deutschem Gerät).
+            publish("$dt/batteryTemp", String.format(Locale.US, "%.1f", state.temperatureC), retained = true)
         }
     }
 
     private fun onMotion(active: Boolean) {
+        KioskStatus.setMotionActive(active)
         val dt = settings.deviceTopic
         mqtt?.publish("$dt/motion", if (active) "on" else "off", retained = true)
         mqtt?.publish("$dt/presence", if (active) "present" else "absent", retained = true)
@@ -214,6 +233,7 @@ class KioskService : LifecycleService() {
     }
 
     private fun onSoundWake() {
+        KioskStatus.pulseSound()
         wakeScreen()
         screenOn = true
         KioskBus.send(KioskCommand.Screen(on = true))
@@ -259,6 +279,7 @@ class KioskService : LifecycleService() {
             "screensaver" -> setScreen(!isOn(payload)) // screensaver an == Bildschirm aus
             "lock" -> if (!SystemController.lock(this)) Log.w(TAG, "Sperren fehlgeschlagen (Geräteadmin aktiv?)")
             "unlock" -> KioskBus.send(KioskCommand.Unlock)
+            "vibrate" -> SystemController.vibrate(this, payload.trim().toLongOrNull() ?: 200L)
             "brightness" -> {
                 val trimmed = payload.trim().lowercase()
                 if (trimmed == "auto" || trimmed == "-1") {
@@ -300,7 +321,7 @@ class KioskService : LifecycleService() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE
         )
-        val notif = NotificationCompat.Builder(this, FhemKioskApp.NOTIF_CHANNEL_ID)
+        val notif = NotificationCompat.Builder(this, FullScreendyApp.NOTIF_CHANNEL_ID)
             .setContentTitle(getString(R.string.notif_title))
             .setContentText(getString(R.string.notif_text))
             .setSmallIcon(android.R.drawable.stat_notify_sync)
@@ -311,7 +332,7 @@ class KioskService : LifecycleService() {
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
         if (camera) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA
         if (microphone) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-        runCatching { ServiceCompat.startForeground(this, FhemKioskApp.NOTIF_ID, notif, type) }
+        runCatching { ServiceCompat.startForeground(this, FullScreendyApp.NOTIF_ID, notif, type) }
             .onFailure { Log.w(TAG, "startForeground(type=$type) fehlgeschlagen", it) }
     }
 

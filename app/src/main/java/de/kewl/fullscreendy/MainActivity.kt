@@ -63,14 +63,13 @@ import de.kewl.fullscreendy.kiosk.KioskCommand
 import de.kewl.fullscreendy.kiosk.KioskStatus
 import de.kewl.fullscreendy.service.KioskService
 import de.kewl.fullscreendy.ui.AboutScreen
-import de.kewl.fullscreendy.ui.HelpScreen
 import de.kewl.fullscreendy.ui.KioskWebView
 import de.kewl.fullscreendy.ui.PinDialog
 import de.kewl.fullscreendy.ui.SettingsScreen
 import de.kewl.fullscreendy.ui.rememberWebController
 import kotlinx.coroutines.launch
 
-private enum class AppPage { Dashboard, Settings, Help, About }
+private enum class AppPage { Dashboard, Settings, About }
 
 class MainActivity : ComponentActivity() {
 
@@ -213,8 +212,11 @@ class MainActivity : ComponentActivity() {
                     onClearCache = { closeDrawer(); webController.clearCache() },
                     onScreenOff = { closeDrawer(); overlayVisible = true },
                     onSettings = { closeDrawer(); showPin = true },
-                    onHelp = { closeDrawer(); page = AppPage.Help },
                     onAbout = { closeDrawer(); page = AppPage.About },
+                    onExit = {
+                        stopService(Intent(this@MainActivity, KioskService::class.java))
+                        finishAndRemoveTask()
+                    },
                 )
             }
         ) {
@@ -274,7 +276,6 @@ class MainActivity : ComponentActivity() {
                             onPersist = { scope.launch { repo.save(it) } },
                             onExit = { if (settings.isConfigured) page = AppPage.Dashboard }
                         )
-                        AppPage.Help -> HelpScreen(onBack = { page = AppPage.Dashboard })
                         AppPage.About -> AboutScreen(settings, onBack = { page = AppPage.Dashboard })
                         AppPage.Dashboard -> Unit
                     }
@@ -300,8 +301,8 @@ private fun AppDrawer(
     onClearCache: () -> Unit,
     onScreenOff: () -> Unit,
     onSettings: () -> Unit,
-    onHelp: () -> Unit,
     onAbout: () -> Unit,
+    onExit: () -> Unit,
 ) {
     val s = LocalStrings.current
     ModalDrawerSheet(modifier = Modifier.width(320.dp)) {
@@ -332,7 +333,8 @@ private fun AppDrawer(
         NavigationDrawerItem(label = { Text(s.navScreenOff) }, selected = false, onClick = onScreenOff, modifier = itemPad)
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
         NavigationDrawerItem(label = { Text(s.navSettings) }, selected = false, onClick = onSettings, modifier = itemPad)
-        NavigationDrawerItem(label = { Text(s.navHelp) }, selected = false, onClick = onHelp, modifier = itemPad)
         NavigationDrawerItem(label = { Text(s.navAbout) }, selected = false, onClick = onAbout, modifier = itemPad)
+        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+        NavigationDrawerItem(label = { Text(s.navExit) }, selected = false, onClick = onExit, modifier = itemPad)
     }
 }

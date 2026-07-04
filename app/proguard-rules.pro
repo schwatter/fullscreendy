@@ -8,6 +8,6 @@
 # App-Komponenten (per Manifest/Reflection referenziert)
 -keep class de.kewl.fullscreendy.AdminReceiver { *; }
 -keep class de.kewl.fullscreendy.BootReceiver { *; }
--keep class de.kewl.fullscreendy.FhemKioskApp { *; }
+-keep class de.kewl.fullscreendy.FullScreendyApp { *; }
 -keep class de.kewl.fullscreendy.MainActivity { *; }
 -keep class de.kewl.fullscreendy.service.KioskService { *; }
