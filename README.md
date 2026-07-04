@@ -187,11 +187,18 @@ Unter *Einstellungen → Anzeige*:
   Overlay ab, statt das Display per Android-Timeout auszuschalten. Der Bildschirm
   bleibt technisch an, damit **Kamera/Mikrofon weiterlaufen** und Bewegung/Ton
   **zuverlässig** wecken – und es blitzt beim Aufwecken **kein Wallpaper/Lockscreen**
-  mehr auf. Berührung oder Bewegung hebt das Abdunkeln sofort auf. `0 s` = nie.
-  (Ist Wecken-auf-Bewegung/-Ton aktiv, bleibt der Bildschirm automatisch an.)
+  mehr auf. Berührung oder **jede** Bewegung hebt das Abdunkeln sofort auf und
+  startet den Timer neu. `0 s` = nie. (Ist Wecken-auf-Bewegung/-Ton aktiv, bleibt
+  der Bildschirm automatisch an.)
+- **Bildschirm ausschalten** (Standard 0 = nie): nach *noch längerer* Inaktivität
+  das Display ganz ausschalten (per Geräteadmin). Danach weckt nur Berührung/Power/
+  `cmd/screen on` – Bewegung nicht mehr (Kamera ist dann aus).
 
-Unter *Einstellungen → System → Berechtigungen* (einmalig erteilen):
-- **Geräteadmin aktivieren** → nötig für `cmd/lock`.
+Unter *Einstellungen → System → Berechtigungen* (einmalig erteilen; erteilte
+Berechtigungen zeigen ein „✓"):
+- **Kamera erlauben** → für Bewegungserkennung (Frontkamera).
+- **Mikrofon erlauben** → für Ton-Weckung.
+- **Geräteadmin aktivieren** → nötig für `cmd/lock` und „Bildschirm ausschalten".
 - **Helligkeitssteuerung erlauben** (WRITE_SETTINGS) → echte Hardware-Helligkeit
   über den vollen Bereich (behebt „nur bis ~60 %").
 - **Dateizugriff erlauben** (All-Files-Access) → damit die App Tondateien aus

@@ -56,6 +56,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import de.kewl.fullscreendy.data.Settings
 import de.kewl.fullscreendy.data.SettingsRepository
+import de.kewl.fullscreendy.device.SystemController
 import de.kewl.fullscreendy.i18n.AppLang
 import de.kewl.fullscreendy.i18n.LocalStrings
 import de.kewl.fullscreendy.i18n.Strings
@@ -196,11 +197,18 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(overlayVisible, brightness) {
             setScreenBrightness(if (overlayVisible) 0f else brightness)
         }
-        // Nach Inaktivität abdunkeln; jede Berührung/Bewegung setzt den Timer zurück.
-        LaunchedEffect(activityNonce, settings.dimTimeoutSecs, page) {
-            if (page == AppPage.Dashboard && settings.dimTimeoutSecs > 0) {
+        // Nach Inaktivität abdunkeln und (optional) ausschalten; jede Berührung/Bewegung
+        // setzt den Timer zurück (activityNonce ändert sich → Effekt startet neu).
+        LaunchedEffect(activityNonce, settings.dimTimeoutSecs, settings.screenOffSecs, page) {
+            if (page != AppPage.Dashboard) return@LaunchedEffect
+            if (settings.dimTimeoutSecs > 0) {
                 delay(settings.dimTimeoutSecs * 1000L)
                 overlayVisible = true
+            }
+            if (settings.screenOffSecs > 0) {
+                val already = if (settings.dimTimeoutSecs > 0) settings.dimTimeoutSecs else 0
+                delay((settings.screenOffSecs - already).coerceAtLeast(0) * 1000L)
+                SystemController.lock(this@MainActivity) // Bildschirm aus (benötigt Geräteadmin)
             }
         }
         LaunchedEffect(Unit) {

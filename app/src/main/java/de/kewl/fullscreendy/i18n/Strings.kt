@@ -72,6 +72,12 @@ class Strings(private val lang: AppLang) {
     )
     val dimAfter get() = t("Dim after", "Abdunkeln nach")
     val off get() = t("off", "aus")
+    val screenOff get() = t("Turn screen off", "Bildschirm ausschalten")
+    val screenOffHint get() = t(
+        "After even longer inactivity, turn the screen fully off (needs device admin). Then only touch/power/cmd wakes it – motion cannot.",
+        "Nach noch längerer Inaktivität den Bildschirm ganz ausschalten (benötigt Geräteadmin). Dann weckt nur Berührung/Power/Befehl – Bewegung nicht."
+    )
+    val offAfter get() = t("Off after", "Aus nach")
 
     // Verhalten
     val motionDetection get() = t("Motion detection (camera)", "Bewegungserkennung (Kamera)")
@@ -107,7 +113,13 @@ class Strings(private val lang: AppLang) {
     val enableDeviceAdmin get() = t("Enable device admin (screen lock)", "Geräteadmin aktivieren (Sperren)")
     val adminActive get() = t("Device admin active ✓", "Geräteadmin aktiv ✓")
     val allowBrightness get() = t("Allow brightness control", "Helligkeitssteuerung erlauben")
+    val brightnessActive get() = t("Brightness control active ✓", "Helligkeitssteuerung aktiv ✓")
     val allowFileAccess get() = t("Allow file access (sounds)", "Dateizugriff erlauben (Töne)")
+    val fileAccessActive get() = t("File access active ✓", "Dateizugriff aktiv ✓")
+    val allowCamera get() = t("Allow camera (motion)", "Kamera erlauben (Bewegung)")
+    val cameraActive get() = t("Camera allowed ✓", "Kamera erlaubt ✓")
+    val allowMic get() = t("Allow microphone (sound)", "Mikrofon erlauben (Ton)")
+    val micActive get() = t("Microphone allowed ✓", "Mikrofon erlaubt ✓")
     val openFailed get() = t("Could not open system settings", "Systemeinstellungen konnten nicht geöffnet werden")
 
     // Über

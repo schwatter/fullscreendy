@@ -136,9 +136,12 @@ class KioskService : LifecycleService() {
 
         if (wantMotion && motion == null) {
             runCatching {
-                motion = MotionDetector(applicationContext, s.motionSensitivity) { active ->
-                    onMotion(active)
-                }.also { it.start(this) }
+                motion = MotionDetector(
+                    applicationContext,
+                    s.motionSensitivity,
+                    onMotionChanged = { active -> onMotion(active) },
+                    onMotionPulse = { onMotionPulse() },
+                ).also { it.start(this) }
             }.onFailure { Log.w(TAG, "Bewegungserkennung nicht gestartet", it) }
         } else if (!wantMotion && motion != null) {
             motion?.stop(); motion = null
@@ -218,18 +221,23 @@ class KioskService : LifecycleService() {
         }
     }
 
+    /** Flanke aktiv/inaktiv – nur für das MQTT-Reading und den Test-Indikator. */
     private fun onMotion(active: Boolean) {
         KioskStatus.setMotionActive(active)
         val dt = settings.deviceTopic
         mqtt?.publish("$dt/motion", if (active) "on" else "off", retained = true)
         mqtt?.publish("$dt/presence", if (active) "present" else "absent", retained = true)
-        if (active && settings.motionWakesScreen) {
-            // Bei Bewegung Display physisch aufwecken und Overlay entfernen.
-            wakeScreen()
+    }
+
+    /** Feuert bei JEDER Bewegung (gedrosselt): weckt & setzt den Abdunkel-Timer zurück. */
+    private fun onMotionPulse() {
+        if (!settings.motionWakesScreen) return
+        wakeScreen()
+        if (!screenOn) {
             screenOn = true
-            KioskBus.send(KioskCommand.Screen(on = true))
             publishScreen(true)
         }
+        KioskBus.send(KioskCommand.Screen(on = true)) // hebt Overlay auf + Timer-Reset
     }
 
     private fun onSoundWake() {

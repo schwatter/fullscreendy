@@ -45,12 +45,17 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Environment
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import de.kewl.fullscreendy.data.Settings
 import de.kewl.fullscreendy.device.SystemController
 import de.kewl.fullscreendy.i18n.LocalStrings
@@ -204,6 +209,17 @@ private fun DisplaySection(draft: Settings, s: Strings, onChange: (Settings) -> 
         suffix = " s",
         zeroLabel = s.off
     ) { onChange(draft.copy(dimTimeoutSecs = it)) }
+
+    HorizontalDivider()
+    Text(s.screenOff, style = MaterialTheme.typography.titleMedium)
+    Text(s.screenOffHint, style = MaterialTheme.typography.bodySmall)
+    SliderRow(
+        label = s.offAfter,
+        value = draft.screenOffSecs,
+        max = 1800,
+        suffix = " s",
+        zeroLabel = s.off
+    ) { onChange(draft.copy(screenOffSecs = it)) }
 }
 
 @Composable
@@ -313,18 +329,37 @@ private fun SystemSection(draft: Settings, s: Strings, onChange: (Settings) -> U
     Text(s.permissionsTitle, style = MaterialTheme.typography.titleMedium)
     val context = LocalContext.current
 
-    // Admin-Status live aktualisieren, wenn man aus den System-Einstellungen zurückkehrt.
+    fun hasPerm(p: String) =
+        ContextCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_GRANTED
+
+    // Status aller Berechtigungen – wird bei Rückkehr in die App aktualisiert.
     var adminActive by remember { mutableStateOf(SystemController.isAdminActive(context)) }
+    var brightnessOk by remember { mutableStateOf(SystemController.canWriteSettings(context)) }
+    var fileOk by remember { mutableStateOf(SystemController.hasAllFilesAccess()) }
+    var cameraOk by remember { mutableStateOf(hasPerm(Manifest.permission.CAMERA)) }
+    var micOk by remember { mutableStateOf(hasPerm(Manifest.permission.RECORD_AUDIO)) }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 adminActive = SystemController.isAdminActive(context)
+                brightnessOk = SystemController.canWriteSettings(context)
+                fileOk = SystemController.hasAllFilesAccess()
+                cameraOk = hasPerm(Manifest.permission.CAMERA)
+                micOk = hasPerm(Manifest.permission.RECORD_AUDIO)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> cameraOk = granted }
+    val micLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted -> micOk = granted }
 
     // WICHTIG: aus der Activity OHNE FLAG_ACTIVITY_NEW_TASK starten – sonst bricht
     // der Geräteadmin-Dialog (der ein Ergebnis erwartet) sofort ab und kehrt zurück.
@@ -350,13 +385,21 @@ private fun SystemSection(draft: Settings, s: Strings, onChange: (Settings) -> U
         modifier = Modifier.fillMaxWidth()
     ) { Text(if (adminActive) s.adminActive else s.enableDeviceAdmin) }
     OutlinedButton(
+        onClick = { if (!cameraOk) cameraLauncher.launch(Manifest.permission.CAMERA) },
+        modifier = Modifier.fillMaxWidth()
+    ) { Text(if (cameraOk) s.cameraActive else s.allowCamera) }
+    OutlinedButton(
+        onClick = { if (!micOk) micLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+        modifier = Modifier.fillMaxWidth()
+    ) { Text(if (micOk) s.micActive else s.allowMic) }
+    OutlinedButton(
         onClick = { open(SystemController.writeSettingsIntent(context)) },
         modifier = Modifier.fillMaxWidth()
-    ) { Text(s.allowBrightness) }
+    ) { Text(if (brightnessOk) s.brightnessActive else s.allowBrightness) }
     OutlinedButton(
         onClick = { open(SystemController.allFilesAccessIntent(context)) },
         modifier = Modifier.fillMaxWidth()
-    ) { Text(s.allowFileAccess) }
+    ) { Text(if (fileOk) s.fileAccessActive else s.allowFileAccess) }
 }
 
 @Composable

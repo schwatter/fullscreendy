@@ -14,24 +14,32 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 /**
- * Bewegungserkennung über die (Front-)Kamera per CameraX. Es wird die
- * mittlere Helligkeit (Luminanz) aufeinanderfolgender Frames verglichen –
- * kein Bild verlässt das Gerät. Meldet Zustandswechsel "Bewegung aktiv/inaktiv".
+ * Bewegungserkennung über die Frontkamera per CameraX. Verglichen wird die
+ * **mittlere absolute Differenz pro Pixel** aufeinanderfolgender Frames – so wird
+ * auch lokale Bewegung (Person bewegt sich) erkannt, nicht nur globale
+ * Helligkeitsänderung. Kein Bild verlässt das Gerät.
+ *
+ * - [onMotionChanged] meldet die Flanken aktiv/inaktiv (für das MQTT-Reading).
+ * - [onMotionPulse] feuert bei JEDER erkannten Bewegung (gedrosselt) – damit
+ *   dauerhafte Bewegung den Abdunkel-Timer immer wieder zurücksetzt und weckt.
  */
 class MotionDetector(
     private val context: Context,
     sensitivity: Int,
     private val onMotionChanged: (active: Boolean) -> Unit,
+    private val onMotionPulse: () -> Unit,
 ) {
-    // Empfindlichkeit 0..100 → Schwelle 8.0 (unempfindlich) .. 0.5 (sehr empfindlich).
-    private val threshold = (8.0 - sensitivity.coerceIn(0, 100) * 0.075).coerceIn(0.5, 8.0)
+    // Empfindlichkeit 0..100 → Schwelle 8.0 (unempfindlich) .. 1.0 (sehr empfindlich),
+    // bezogen auf die mittlere Pro-Pixel-Differenz (0..255).
+    private val threshold = (8.0 - sensitivity.coerceIn(0, 100) * 0.07).coerceIn(1.0, 8.0)
 
     private val analysisExecutor = Executors.newSingleThreadExecutor()
     private val timer: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     private var provider: ProcessCameraProvider? = null
 
-    @Volatile private var previousLuma: Double = -1.0
+    @Volatile private var previous: IntArray? = null
     @Volatile private var lastMotionAt: Long = 0L
+    @Volatile private var lastPulseAt: Long = 0L
     @Volatile private var active: Boolean = false
 
     fun start(lifecycleOwner: LifecycleOwner) {
@@ -40,13 +48,20 @@ class MotionDetector(
             val cameraProvider = runCatching { future.get() }.getOrNull() ?: return@addListener
             provider = cameraProvider
 
+            // Ohne (Front-)Kamera nicht binden – vermeidet endlose Fehler-Retries.
+            val hasFront = cameraProvider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+            val hasBack = cameraProvider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)
+            if (!hasFront && !hasBack) {
+                Log.w(TAG, "Keine Kamera verfügbar – Bewegungserkennung aus")
+                return@addListener
+            }
+            val selector = if (hasFront) CameraSelector.DEFAULT_FRONT_CAMERA
+            else CameraSelector.DEFAULT_BACK_CAMERA
+
             val analysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also { it.setAnalyzer(analysisExecutor, ::analyze) }
-
-            val selector = if (cameraProvider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA))
-                CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
 
             runCatching {
                 cameraProvider.unbindAll()
@@ -65,44 +80,60 @@ class MotionDetector(
 
     private fun analyze(image: ImageProxy) {
         try {
-            val luma = averageLuma(image)
-            if (previousLuma >= 0) {
-                val diff = abs(luma - previousLuma)
-                if (diff > threshold) {
-                    lastMotionAt = System.currentTimeMillis()
-                    if (!active) {
-                        active = true
-                        onMotionChanged(true)
-                    }
+            val current = sample(image)
+            val prev = previous
+            if (prev != null && prev.size == current.size) {
+                var sum = 0L
+                var i = 0
+                while (i < current.size) {
+                    sum += abs(current[i] - prev[i])
+                    i++
                 }
+                val meanDiff = sum.toDouble() / current.size
+                if (meanDiff > threshold) onMotion()
             }
-            previousLuma = luma
+            previous = current
         } finally {
             image.close()
         }
     }
 
-    /** Mittelwert über die Y-Ebene (Helligkeit), mit Sub-Sampling für Effizienz. */
-    private fun averageLuma(image: ImageProxy): Double {
-        val plane = image.planes[0]
-        val buffer = plane.buffer
+    private fun onMotion() {
+        val now = System.currentTimeMillis()
+        lastMotionAt = now
+        if (!active) {
+            active = true
+            onMotionChanged(true)
+        }
+        // Impuls gedrosselt, damit dauerhafte Bewegung regelmäßig (aber nicht in
+        // jedem Frame) weckt und den Abdunkel-Timer zurücksetzt.
+        if (now - lastPulseAt > PULSE_THROTTLE_MS) {
+            lastPulseAt = now
+            onMotionPulse()
+        }
+    }
+
+    /** Stichprobe der Y-Ebene (Helligkeit) als IntArray, für den Pro-Pixel-Vergleich. */
+    private fun sample(image: ImageProxy): IntArray {
+        val buffer = image.planes[0].buffer
         buffer.rewind()
-        var sum = 0L
-        var count = 0
         val size = buffer.remaining()
+        val n = size / SAMPLE_STEP
+        val out = IntArray(n)
+        var idx = 0
         var i = 0
-        while (i < size) {
-            sum += (buffer.get(i).toInt() and 0xFF)
-            count++
+        while (idx < n) {
+            out[idx] = buffer.get(i).toInt() and 0xFF
+            idx++
             i += SAMPLE_STEP
         }
-        return if (count > 0) sum.toDouble() / count else 0.0
+        return out
     }
 
     fun stop() {
         runCatching { provider?.unbindAll() }
         provider = null
-        previousLuma = -1.0
+        previous = null
         active = false
         timer.shutdownNow()
         analysisExecutor.shutdown()
@@ -111,7 +142,9 @@ class MotionDetector(
     companion object {
         private const val TAG = "MotionDetector"
         /** Nach so vielen ms ohne Bewegung gilt der Zustand als "inaktiv". */
-        private const val QUIET_MILLIS = 15_000L
+        private const val QUIET_MILLIS = 8_000L
+        /** Frühestens alle so viele ms einen Weck-Impuls senden. */
+        private const val PULSE_THROTTLE_MS = 700L
         /** Nur jedes n-te Byte auswerten (Performance). */
         private const val SAMPLE_STEP = 16
     }

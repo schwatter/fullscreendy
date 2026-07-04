@@ -20,6 +20,8 @@ data class Settings(
     val keepScreenOn: Boolean = false,
     /** Nach so vielen Sekunden Inaktivität schwarz abdunkeln (Overlay); 0 = nie. */
     val dimTimeoutSecs: Int = 60,
+    /** Nach so vielen Sekunden Inaktivität Bildschirm ausschalten (Geräteadmin); 0 = nie. */
+    val screenOffSecs: Int = 0,
     val ignoreSystemFontScale: Boolean = true,
     val ttsEnabled: Boolean = true,
     val mediaEnabled: Boolean = true,

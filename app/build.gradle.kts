@@ -22,8 +22,8 @@ android {
         applicationId = "de.kewl.fullscreendy"
         minSdk = 29
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.4.1"
+        versionCode = 9
+        versionName = "0.4.2"
     }
 
     signingConfigs {
