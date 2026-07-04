@@ -65,6 +65,13 @@ class Strings(private val lang: AppLang) {
     val ignoreFontScale get() = t("Font independent of system zoom", "Schrift unabhängig von System-Zoom")
     val allowZoom get() = t("Allow pinch-zoom in dashboard", "Zoomen im Dashboard erlauben")
     val keepScreenOn get() = t("Keep screen always on", "Bildschirm immer an")
+    val dimTimeout get() = t("Screen dimming", "Bildschirm abdunkeln")
+    val dimTimeoutHint get() = t(
+        "Dims to black after inactivity (screen stays on so motion/sound wake reliably). Touch/motion wakes it.",
+        "Dunkelt nach Inaktivität schwarz ab (Bildschirm bleibt an, damit Bewegung/Ton zuverlässig wecken). Berührung/Bewegung weckt."
+    )
+    val dimAfter get() = t("Dim after", "Abdunkeln nach")
+    val off get() = t("off", "aus")
 
     // Verhalten
     val motionDetection get() = t("Motion detection (camera)", "Bewegungserkennung (Kamera)")

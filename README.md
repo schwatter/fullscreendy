@@ -182,7 +182,13 @@ Unter *Einstellungen → Verhalten*:
   dann winken bzw. Geräusch machen.
 
 Unter *Einstellungen → Anzeige*:
-- **Bildschirm immer an** ist jetzt **standardmäßig aus**.
+- **Bildschirm immer an** ist standardmäßig aus.
+- **Bildschirm abdunkeln** (Standard 60 s): dunkelt nach Inaktivität per schwarzem
+  Overlay ab, statt das Display per Android-Timeout auszuschalten. Der Bildschirm
+  bleibt technisch an, damit **Kamera/Mikrofon weiterlaufen** und Bewegung/Ton
+  **zuverlässig** wecken – und es blitzt beim Aufwecken **kein Wallpaper/Lockscreen**
+  mehr auf. Berührung oder Bewegung hebt das Abdunkeln sofort auf. `0 s` = nie.
+  (Ist Wecken-auf-Bewegung/-Ton aktiv, bleibt der Bildschirm automatisch an.)
 
 Unter *Einstellungen → System → Berechtigungen* (einmalig erteilen):
 - **Geräteadmin aktivieren** → nötig für `cmd/lock`.
@@ -215,9 +221,10 @@ Einstellungen liegen in Jetpack DataStore; alle Topics werden daraus abgeleitet.
 ## Bekannte Grenzen / To-do
 - `cmd/unlock` weckt und löst nur einen **unsicheren** Sperrbildschirm; eine
   gesicherte PIN/Muster kann aus Sicherheitsgründen nicht umgangen werden.
-- **Bewegungs-/Ton-Weckung** brauchen Kamera/Mikrofon im Vordergrund (Kiosk-Fall).
-  Startet das Display per Zeitüberschreitung komplett durch, wecke lieber per
-  `cmd/screen on` (Wakelock) – das funktioniert immer.
+- **Bewegungs-/Ton-Weckung** funktionieren nur, solange der Bildschirm technisch an
+  ist – daher das *Abdunkeln*-Overlay statt echtem Screen-Off. Lässt man das Display
+  per Android-Timeout ganz ausgehen, stoppt die Kamera und Bewegung weckt nicht mehr;
+  dann hilft nur `cmd/screen on` (Wakelock).
 - Kamera/Mikrofon starten nur, wenn die App im Vordergrund war; nach reinem
   Boot ohne Öffnen bleiben sie aus (Android-Hintergrund-Restriktion).
 - Autostart nach Boot ist je nach Hersteller unzuverlässig (Android blockiert

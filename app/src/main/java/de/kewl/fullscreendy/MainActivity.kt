@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -67,6 +68,7 @@ import de.kewl.fullscreendy.ui.KioskWebView
 import de.kewl.fullscreendy.ui.PinDialog
 import de.kewl.fullscreendy.ui.SettingsScreen
 import de.kewl.fullscreendy.ui.rememberWebController
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class AppPage { Dashboard, Settings, About }
@@ -178,13 +180,28 @@ class MainActivity : ComponentActivity() {
         var showPin by remember { mutableStateOf(false) }
         var overlayVisible by remember { mutableStateOf(false) }
         var brightness by remember { mutableStateOf(-1f) }
+        var activityNonce by remember { mutableStateOf(0) }
 
         LaunchedEffect(settings.isConfigured) {
             if (!settings.isConfigured) page = AppPage.Settings
         }
-        LaunchedEffect(settings.keepScreenOn) { setKeepScreenOn(settings.keepScreenOn) }
+        // Bildschirm anlassen, wenn Wecken-auf-Bewegung/Ton oder Auto-Abdunkeln aktiv ist –
+        // nur so laufen Kamera/Mikrofon zuverlässig weiter (kein OS-Screen-Off, kein
+        // Wallpaper-Blitzen). "Aus" wird über das schwarze Overlay realisiert.
+        val keepScreenOn = settings.keepScreenOn ||
+            (settings.motionEnabled && settings.motionWakesScreen) ||
+            settings.soundWakeEnabled ||
+            settings.dimTimeoutSecs > 0
+        LaunchedEffect(keepScreenOn) { setKeepScreenOn(keepScreenOn) }
         LaunchedEffect(overlayVisible, brightness) {
             setScreenBrightness(if (overlayVisible) 0f else brightness)
+        }
+        // Nach Inaktivität abdunkeln; jede Berührung/Bewegung setzt den Timer zurück.
+        LaunchedEffect(activityNonce, settings.dimTimeoutSecs, page) {
+            if (page == AppPage.Dashboard && settings.dimTimeoutSecs > 0) {
+                delay(settings.dimTimeoutSecs * 1000L)
+                overlayVisible = true
+            }
         }
         LaunchedEffect(Unit) {
             KioskBus.commands.collect { cmd ->
@@ -192,7 +209,10 @@ class MainActivity : ComponentActivity() {
                     is KioskCommand.LoadUrl -> webController.load(cmd.url)
                     KioskCommand.Reload -> webController.reload()
                     KioskCommand.ClearCache -> webController.clearCache()
-                    is KioskCommand.Screen -> overlayVisible = !cmd.on
+                    is KioskCommand.Screen -> {
+                        overlayVisible = !cmd.on
+                        if (cmd.on) activityNonce++ // Abdunkel-Timer neu starten
+                    }
                     is KioskCommand.Brightness -> brightness = cmd.level
                     KioskCommand.Unlock -> unlockDevice()
                 }
@@ -221,7 +241,21 @@ class MainActivity : ComponentActivity() {
             }
         ) {
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        // Jede Berührung zählt als Aktivität (Initial-Pass = nicht konsumierend,
+                        // damit WebView/Buttons weiter funktionieren).
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    awaitPointerEvent(PointerEventPass.Initial)
+                                    if (overlayVisible) overlayVisible = false
+                                    activityNonce++
+                                }
+                            }
+                        }
+                ) {
                     // Dashboard-WebView ist immer vorhanden; Unterseiten legen sich darüber.
                     key(settings.ignoreSystemFontScale, settings.zoomEnabled) {
                         KioskWebView(

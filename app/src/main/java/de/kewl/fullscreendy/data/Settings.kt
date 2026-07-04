@@ -18,6 +18,8 @@ data class Settings(
     val soundWakeEnabled: Boolean = false,
     val soundSensitivity: Int = 50,
     val keepScreenOn: Boolean = false,
+    /** Nach so vielen Sekunden Inaktivität schwarz abdunkeln (Overlay); 0 = nie. */
+    val dimTimeoutSecs: Int = 60,
     val ignoreSystemFontScale: Boolean = true,
     val ttsEnabled: Boolean = true,
     val mediaEnabled: Boolean = true,

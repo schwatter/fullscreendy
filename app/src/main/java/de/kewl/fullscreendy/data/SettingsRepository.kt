@@ -30,6 +30,7 @@ class SettingsRepository(private val context: Context) {
         val SOUND_WAKE = booleanPreferencesKey("sound_wake_enabled")
         val SOUND_SENS = intPreferencesKey("sound_sensitivity")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val DIM_TIMEOUT = intPreferencesKey("dim_timeout_secs")
         val IGNORE_FONT_SCALE = booleanPreferencesKey("ignore_font_scale")
         val TTS_ENABLED = booleanPreferencesKey("tts_enabled")
         val MEDIA_ENABLED = booleanPreferencesKey("media_enabled")
@@ -57,6 +58,7 @@ class SettingsRepository(private val context: Context) {
             soundWakeEnabled = p[Keys.SOUND_WAKE] ?: defaults.soundWakeEnabled,
             soundSensitivity = p[Keys.SOUND_SENS] ?: defaults.soundSensitivity,
             keepScreenOn = p[Keys.KEEP_SCREEN_ON] ?: defaults.keepScreenOn,
+            dimTimeoutSecs = p[Keys.DIM_TIMEOUT] ?: defaults.dimTimeoutSecs,
             ignoreSystemFontScale = p[Keys.IGNORE_FONT_SCALE] ?: defaults.ignoreSystemFontScale,
             ttsEnabled = p[Keys.TTS_ENABLED] ?: defaults.ttsEnabled,
             mediaEnabled = p[Keys.MEDIA_ENABLED] ?: defaults.mediaEnabled,
@@ -84,6 +86,7 @@ class SettingsRepository(private val context: Context) {
             p[Keys.SOUND_WAKE] = s.soundWakeEnabled
             p[Keys.SOUND_SENS] = s.soundSensitivity
             p[Keys.KEEP_SCREEN_ON] = s.keepScreenOn
+            p[Keys.DIM_TIMEOUT] = s.dimTimeoutSecs
             p[Keys.IGNORE_FONT_SCALE] = s.ignoreSystemFontScale
             p[Keys.TTS_ENABLED] = s.ttsEnabled
             p[Keys.MEDIA_ENABLED] = s.mediaEnabled

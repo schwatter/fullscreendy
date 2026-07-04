@@ -45,6 +45,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.os.Environment
 import android.widget.Toast
@@ -191,6 +194,16 @@ private fun DisplaySection(draft: Settings, s: Strings, onChange: (Settings) -> 
     }
     SwitchRow(s.allowZoom, draft.zoomEnabled) { onChange(draft.copy(zoomEnabled = it)) }
     SwitchRow(s.keepScreenOn, draft.keepScreenOn) { onChange(draft.copy(keepScreenOn = it)) }
+    HorizontalDivider()
+    Text(s.dimTimeout, style = MaterialTheme.typography.titleMedium)
+    Text(s.dimTimeoutHint, style = MaterialTheme.typography.bodySmall)
+    SliderRow(
+        label = s.dimAfter,
+        value = draft.dimTimeoutSecs,
+        max = 300,
+        suffix = " s",
+        zeroLabel = s.off
+    ) { onChange(draft.copy(dimTimeoutSecs = it)) }
 }
 
 @Composable
@@ -313,14 +326,16 @@ private fun SystemSection(draft: Settings, s: Strings, onChange: (Settings) -> U
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    // WICHTIG: aus der Activity OHNE FLAG_ACTIVITY_NEW_TASK starten – sonst bricht
+    // der Geräteadmin-Dialog (der ein Ergebnis erwartet) sofort ab und kehrt zurück.
+    val activity = context.findActivity()
+    fun launch(i: Intent): Boolean = runCatching {
+        if (activity != null) activity.startActivity(i)
+        else context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }.isSuccess
     fun open(intent: Intent, fallback: Intent? = null) {
-        val ok = runCatching {
-            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }.isSuccess
-        if (!ok) {
-            val fbOk = fallback != null && runCatching {
-                context.startActivity(fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            }.isSuccess
+        if (!launch(intent)) {
+            val fbOk = fallback != null && launch(fallback)
             if (!fbOk) Toast.makeText(context, s.openFailed, Toast.LENGTH_SHORT).show()
         }
     }
@@ -345,21 +360,40 @@ private fun SystemSection(draft: Settings, s: Strings, onChange: (Settings) -> U
 }
 
 @Composable
-private fun SliderRow(label: String, value: Int, onChange: (Int) -> Unit) {
+private fun SliderRow(
+    label: String,
+    value: Int,
+    max: Int = 100,
+    suffix: String = "",
+    zeroLabel: String? = null,
+    onChange: (Int) -> Unit,
+) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(label, style = MaterialTheme.typography.bodyLarge)
-            Text("$value", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                if (value == 0 && zeroLabel != null) zeroLabel else "$value$suffix",
+                style = MaterialTheme.typography.bodyLarge
+            )
         }
         Slider(
             value = value.toFloat(),
             onValueChange = { onChange(it.roundToInt()) },
-            valueRange = 0f..100f
+            valueRange = 0f..max.toFloat()
         )
     }
+}
+
+private fun Context.findActivity(): Activity? {
+    var ctx: Context? = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
 }
 
 @Composable
