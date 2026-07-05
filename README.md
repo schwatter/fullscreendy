@@ -75,6 +75,7 @@ Basis: `<Basis-Topic>/<Geräte-ID>`, im Beispiel `fhem/tablet/tablet1`.
 | `…/presence` | `present` / `absent` |
 | `…/screen` | `on` / `off` |
 | `…/brightness` | `0`–`100` oder `auto` |
+| `…/volume` | `0`–`100` (Medienlautstärke) |
 | `…/url` | aktuell geladene URL |
 | `…/ip` | IPv4-Adresse |
 | `…/appVersion` | App-Version, z. B. `0.2.0` |
@@ -93,6 +94,7 @@ Basis: `<Basis-Topic>/<Geräte-ID>`, im Beispiel `fhem/tablet/tablet1`.
 | `cmd/screen` | `on` / `off` | weckt das Display physisch (an) bzw. schwarzes Overlay (aus) |
 | `cmd/screensaver` | `on` / `off` | wie `screen`, invertiert |
 | `cmd/brightness` | `0`–`100` oder `auto` | Helligkeit (voller Bereich mit „Helligkeitssteuerung erlauben") |
+| `cmd/volume` | `0`–`100` | Medienlautstärke (TTS/Töne) |
 | `cmd/lock` | (egal) | sperrt den Bildschirm (benötigt Geräteadmin) |
 | `cmd/unlock` | (egal) | weckt & löst den (unsicheren) Sperrbildschirm |
 | `cmd/vibrate` | Dauer in ms (leer = 200) | Vibrations-Feedback, max. 5000 ms |
@@ -114,9 +116,8 @@ Sobald das Tablet zum ersten Mal publisht, schlägt FHEM per `autocreate` ein
 `MQTT2_DEVICE` vor. Alternativ manuell:
 
 ```
-define tablet1 MQTT2_DEVICE
-attr tablet1 readingList \
-  fhem/tablet/tablet1/status:.* status \
+define fullscreendy MQTT2_DEVICE
+attr fullscreendy readingList fhem/tablet/tablet1/status:.* status \
   fhem/tablet/tablet1/battery:.* battery \
   fhem/tablet/tablet1/charging:.* charging \
   fhem/tablet/tablet1/plug:.* plug \
@@ -125,12 +126,15 @@ attr tablet1 readingList \
   fhem/tablet/tablet1/presence:.* presence \
   fhem/tablet/tablet1/screen:.* screen \
   fhem/tablet/tablet1/brightness:.* brightness \
+  fhem/tablet/tablet1/volume:.* volume \
   fhem/tablet/tablet1/url:.* url \
   fhem/tablet/tablet1/ip:.* ip \
   fhem/tablet/tablet1/appVersion:.* appVersion \
   fhem/tablet/tablet1/androidVersion:.* androidVersion
-attr tablet1 setList \
-  screenOn:noArg   fhem/tablet/tablet1/cmd/screen on \
+```
+Set Befehle müssen Manuell gesetzt werden "fullscreendy" durch euren Gerätenamen ersetzten
+```
+attr fullscreendy setList screenOn:noArg   fhem/tablet/tablet1/cmd/screen on \
   screenOff:noArg  fhem/tablet/tablet1/cmd/screen off \
   reload:noArg     fhem/tablet/tablet1/cmd/reload 1 \
   clearCache:noArg fhem/tablet/tablet1/cmd/clearcache 1 \
@@ -138,9 +142,11 @@ attr tablet1 setList \
   unlock:noArg     fhem/tablet/tablet1/cmd/unlock 1 \
   mediaStop:noArg  fhem/tablet/tablet1/cmd/mediastop 1 \
   brightness:slider,0,1,100 fhem/tablet/tablet1/cmd/brightness $EVTPART1 \
+  volume:slider,0,1,100 fhem/tablet/tablet1/cmd/volume $EVTPART1 \
   url:textField       fhem/tablet/tablet1/cmd/url $EVTPART1 \
-  mediaPlay:textField fhem/tablet/tablet1/cmd/mediaplay $EVTPART1
-attr tablet1 stateFormat online battery %
+  mediaPlay:textField fhem/tablet/tablet1/cmd/mediaplay $EVTPART1 \
+  say:textField {my @a=split(" ",$EVENT);; shift(@a);; return "fhem/tablet/tablet1/cmd/tts ".join(" ",@a)}
+attr fullscreendy stateFormat online battery %
 ```
 
 `$EVTPART1` reicht für Werte ohne Leerzeichen (Zahl, URL, Dateipfad).
@@ -150,8 +156,7 @@ attr tablet1 stateFormat online battery %
 der `$EVENT` ab dem ersten Leerzeichen abschneidet:
 
 ```
-attr tablet1 setList {...bisherige Zeilen...} \
-  say:textField {my @a=split(" ",$EVENT);; shift(@a);; return "fhem/tablet/tablet1/cmd/tts ".join(" ",@a)}
+attr <device> setList say:textField {my @a=split(" ",$EVENT);; shift(@a);; return "fhem/tablet/tablet1/cmd/tts ".join(" ",@a)}
 ```
 
 Alternativ direkt publizieren (`<IODev>` = dein MQTT2_SERVER/CLIENT):
@@ -180,6 +185,10 @@ Unter *Einstellungen → Verhalten*:
 - **Test-Indikatoren**: bei aktivierter Bewegungs-/Ton-Erkennung zeigen grüne
   Punkte live jede Erkennung an (das Gerät vibriert dabei kurz). Erst speichern,
   dann winken bzw. Geräusch machen.
+- **Robust gegen Lichtwechsel**: die Bewegungserkennung zieht die globale
+  Helligkeitsänderung ab und verlangt mehrere Frames – gleichmäßiges Flackern
+  (Fernseher, Beleuchtung) löst nicht aus, lokale Bewegung schon. Reagiert es
+  trotzdem noch, die **Bewegungs-Empfindlichkeit** etwas verringern.
 
 Unter *Einstellungen → Anzeige*:
 - **Bildschirm immer an** ist standardmäßig aus.

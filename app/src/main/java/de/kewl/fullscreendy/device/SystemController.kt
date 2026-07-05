@@ -4,6 +4,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -35,6 +36,27 @@ object SystemController {
     }
 
     fun canWriteSettings(ctx: Context): Boolean = Settings.System.canWrite(ctx)
+
+    // ---- Medien-Lautstärke (STREAM_MUSIC – betrifft TTS und Töne) --------------
+
+    private fun audio(ctx: Context) = ctx.getSystemService(AudioManager::class.java)
+
+    /** Aktuelle Medienlautstärke in Prozent (0..100). */
+    fun getVolumePercent(ctx: Context): Int {
+        val am = audio(ctx) ?: return 0
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val cur = am.getStreamVolume(AudioManager.STREAM_MUSIC)
+        return if (max > 0) (cur * 100 / max) else 0
+    }
+
+    /** Setzt die Medienlautstärke (0..100) und gibt den tatsächlichen Prozentwert zurück. */
+    fun setVolumePercent(ctx: Context, percent: Int): Int {
+        val am = audio(ctx) ?: return 0
+        val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val target = (percent.coerceIn(0, 100) * max + 50) / 100 // gerundet
+        runCatching { am.setStreamVolume(AudioManager.STREAM_MUSIC, target.coerceIn(0, max), 0) }
+        return getVolumePercent(ctx)
+    }
 
     /** Vibriert für [ms] Millisekunden (1..5000). Für haptisches Feedback per MQTT. */
     @Suppress("DEPRECATION")

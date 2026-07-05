@@ -14,10 +14,11 @@ import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 /**
- * Bewegungserkennung über die Frontkamera per CameraX. Verglichen wird die
- * **mittlere absolute Differenz pro Pixel** aufeinanderfolgender Frames – so wird
- * auch lokale Bewegung (Person bewegt sich) erkannt, nicht nur globale
- * Helligkeitsänderung. Kein Bild verlässt das Gerät.
+ * Bewegungserkennung über die Frontkamera per CameraX. Verglichen werden
+ * aufeinanderfolgende Frames über die **mittlere absolute Abweichung der
+ * Pixeldifferenz** (nach Abzug der globalen Helligkeitsverschiebung). Dadurch
+ * lösen gleichmäßige Lichtwechsel (Fernseher, Beleuchtung, Auto-Helligkeit)
+ * NICHT aus, wohl aber lokale Bewegung (Person). Kein Bild verlässt das Gerät.
  *
  * - [onMotionChanged] meldet die Flanken aktiv/inaktiv (für das MQTT-Reading).
  * - [onMotionPulse] feuert bei JEDER erkannten Bewegung (gedrosselt) – damit
@@ -41,6 +42,7 @@ class MotionDetector(
     @Volatile private var lastMotionAt: Long = 0L
     @Volatile private var lastPulseAt: Long = 0L
     @Volatile private var active: Boolean = false
+    @Volatile private var motionFrames: Int = 0
 
     fun start(lifecycleOwner: LifecycleOwner) {
         val future = ProcessCameraProvider.getInstance(context)
@@ -83,14 +85,27 @@ class MotionDetector(
             val current = sample(image)
             val prev = previous
             if (prev != null && prev.size == current.size) {
-                var sum = 0L
+                val n = current.size
+                // Globale Helligkeitsverschiebung (TV/Licht/Auto-Helligkeit) bestimmen …
+                var sumDelta = 0L
                 var i = 0
-                while (i < current.size) {
-                    sum += abs(current[i] - prev[i])
-                    i++
+                while (i < n) { sumDelta += (current[i] - prev[i]); i++ }
+                val mean = sumDelta.toDouble() / n
+                // … und abziehen: übrig bleibt LOKALE Bewegung. Ein gleichmäßiger
+                // Lichtwechsel (ganzes Bild ~gleich heller/dunkler) ergibt ~0.
+                var sumDev = 0.0
+                i = 0
+                while (i < n) { sumDev += abs((current[i] - prev[i]) - mean); i++ }
+                val mad = sumDev / n
+
+                if (mad > threshold) {
+                    // Mehrere aufeinanderfolgende Frames verlangen → filtert einzelne
+                    // Blitzer/Flackern heraus, echte Bewegung dauert länger an.
+                    motionFrames++
+                    if (motionFrames >= MIN_MOTION_FRAMES) onMotion()
+                } else {
+                    motionFrames = 0
                 }
-                val meanDiff = sum.toDouble() / current.size
-                if (meanDiff > threshold) onMotion()
             }
             previous = current
         } finally {
@@ -145,6 +160,8 @@ class MotionDetector(
         private const val QUIET_MILLIS = 8_000L
         /** Frühestens alle so viele ms einen Weck-Impuls senden. */
         private const val PULSE_THROTTLE_MS = 700L
+        /** So viele aufeinanderfolgende Bewegungs-Frames nötig (gegen Flackern/Blitzer). */
+        private const val MIN_MOTION_FRAMES = 3
         /** Nur jedes n-te Byte auswerten (Performance). */
         private const val SAMPLE_STEP = 16
     }

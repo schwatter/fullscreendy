@@ -194,6 +194,11 @@ class KioskService : LifecycleService() {
         publishScreen(screenOn)
         publishUrl()
         publishBrightness()
+        publishVolume()
+    }
+
+    private fun publishVolume() {
+        mqtt?.publish("${settings.deviceTopic}/volume", SystemController.getVolumePercent(this).toString(), retained = true)
     }
 
     private fun publishUrl() {
@@ -288,6 +293,10 @@ class KioskService : LifecycleService() {
             "lock" -> if (!SystemController.lock(this)) Log.w(TAG, "Sperren fehlgeschlagen (Geräteadmin aktiv?)")
             "unlock" -> KioskBus.send(KioskCommand.Unlock)
             "vibrate" -> SystemController.vibrate(this, payload.trim().toLongOrNull() ?: 200L)
+            "volume", "vol" -> {
+                payload.trim().toIntOrNull()?.let { SystemController.setVolumePercent(this, it) }
+                publishVolume()
+            }
             "brightness" -> {
                 val trimmed = payload.trim().lowercase()
                 if (trimmed == "auto" || trimmed == "-1") {
