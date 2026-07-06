@@ -3,7 +3,7 @@
 Ein Vollbild-Kiosk-Browser (Chromium/WebView) für Android-Wandtablets, der ein
 FHEM-Dashboard anzeigt und das Tablet über **MQTT** als FHEM-Gerät anbindet.
 
-- 🔋 **Akku & Laden** – Ladestand, Ladezustand, Stecker-Typ, Temperatur
+- 🔋 **Akku & Laden** – Ladestand, Ladezustand, Temperatur
 - 🔊 **Text-to-Speech** – FHEM schickt Text, das Tablet spricht ihn
 - 🔈 **Töne** – gespeicherte Sounddateien im Hintergrund abspielen
 - 🖥️ **Bildschirm-Steuerung** – an/aus (Overlay) und Helligkeit
