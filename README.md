@@ -1,5 +1,7 @@
 # FullScreendy
 
+![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
+
 Ein Vollbild-Kiosk-Browser (Chromium/WebView) für Android-Wandtablets, der ein
 FHEM-Dashboard anzeigt und das Tablet über **MQTT** als FHEM-Gerät anbindet.
 
@@ -227,7 +229,8 @@ KioskService (Foreground) ── MqttManager (Paho, Auto-Reconnect, Last-Will)
       ├── BatteryMonitor   → …/battery, …/charging, …
       ├── TtsManager       ← …/cmd/tts
       ├── MediaManager     ← …/cmd/mediaplay
-      └── MotionDetector   → …/motion, …/presence   (CameraX, Luminanz-Diff)
+      ├── SoundDetector    → weckt (AudioRecord, Lautstärke)
+      └── MotionDetector   → …/motion, …/presence (CameraX, lichtkompensiert)
 ```
 
 Einstellungen liegen in Jetpack DataStore; alle Topics werden daraus abgeleitet.
@@ -247,4 +250,13 @@ Einstellungen liegen in Jetpack DataStore; alle Topics werden daraus abgeleitet.
   Hintergrund-Activity-Starts) – ggf. **OEM-Autostart** für die App erlauben.
 - TLS nutzt den System-Truststore; selbstsignierte Broker-Zertifikate müssten
   ergänzt werden.
-- `cmd/volume` (Lautstärke für TTS/Media) ist noch nicht umgesetzt.
+
+---
+
+## Lizenz
+
+[MIT](LICENSE) © Glenn-Dandy. Nutzung, Änderung und Weitergabe (auch kommerziell)
+frei, solange Copyright- und Lizenzhinweis erhalten bleiben. Ohne Gewährleistung.
+
+Genutzte Bibliotheken behalten ihre eigenen Lizenzen (u. a. Eclipse Paho,
+AndroidX/Jetpack Compose – Apache-2.0).
