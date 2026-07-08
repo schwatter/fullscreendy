@@ -2,120 +2,123 @@
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 
-Ein Vollbild-Kiosk-Browser (Chromium/WebView) für Android-Wandtablets, der ein
-FHEM-Dashboard anzeigt und das Tablet über **MQTT** als FHEM-Gerät anbindet.
+**English** · [Deutsch](README.de.md)
 
-- 🔋 **Akku & Laden** – Ladestand, Ladezustand, Temperatur
-- 🔊 **Text-to-Speech** – FHEM schickt Text, das Tablet spricht ihn
-- 🔈 **Töne** – gespeicherte Sounddateien im Hintergrund abspielen
-- 🖥️ **Bildschirm-Steuerung** – an/aus (Overlay) und Helligkeit
-- 🚶 **Präsenz / Bewegung** – Kamera-Bewegungserkennung, weckt das Display (kein Bild verlässt das Gerät)
-- 🌐 **Fernsteuerung** – URL wechseln, neu laden, Cache leeren – alles per MQTT
-- 🗂️ **Menü** – von links einwischen: Status, Aktionen, Einstellungen (PIN), Über, App beenden
-- 🌍 **Zweisprachig** – Englisch (Standard) / Deutsch
+A fullscreen kiosk browser (Chromium/WebView) for Android wall tablets that shows
+an FHEM dashboard and integrates the tablet as an FHEM device over **MQTT**.
 
-Alles läuft in einem dauerhaften Foreground-Service mit Auto-Reconnect zum MQTT-Broker.
+- 🔋 **Battery & charging** – level, charging state, temperature
+- 🔊 **Text-to-speech** – FHEM sends text, the tablet speaks it
+- 🔈 **Sounds** – play stored sound files in the background
+- 🖥️ **Screen control** – on/off (overlay) and brightness
+- 🚶 **Presence / motion** – camera motion detection wakes the display (no image leaves the device)
+- 🌐 **Remote control** – switch URL, reload, clear cache – all via MQTT
+- 🗂️ **Menu** – swipe in from the left: status, actions, settings (PIN), about, exit
+- 🌍 **Bilingual** – English (default) / German
+
+Everything runs in a persistent foreground service with auto-reconnect to the MQTT broker.
 
 ---
 
-## Bauen
+## Build
 
-Voraussetzung: **Android Studio** (Ladybug o. neuer) mit Android SDK 35.
+Requires **Android Studio** (Ladybug or newer) with Android SDK 35.
 
-1. In Android Studio: *File → Open* → diesen Ordner (`fullscreendy`) wählen.
-2. Gradle-Sync abwarten (lädt AGP 8.7, Kotlin 2.1, Abhängigkeiten).
-3. *Run* auf ein Gerät/Emulator (Android 10+), oder APK bauen:
+1. In Android Studio: *File → Open* → select this folder (`fullscreendy`).
+2. Wait for the Gradle sync (downloads AGP 8.7, Kotlin 2.1, dependencies).
+3. *Run* on a device/emulator (Android 10+), or build an APK:
    *Build → Build Bundle(s)/APK(s) → Build APK(s)*.
 
 ```bash
-gradle wrapper            # einmalig, legt ./gradlew an
+gradle wrapper            # once, creates ./gradlew
 ./gradlew assembleDebug    # APK: app/build/outputs/apk/debug/app-debug.apk
 ```
 
+Prebuilt signed APKs are on the [Releases page](https://github.com/Glenn-Dandy/fullscreendy/releases).
+
 ---
 
-## Erste Einrichtung (auf dem Tablet)
+## First setup (on the tablet)
 
-1. App starten. Da noch keine URL konfiguriert ist, öffnen sich direkt die
-   **Einstellungen**.
-2. Eintragen:
-   - *Verbindung*: **Dashboard-URL** (z. B. `http://192.168.1.10:8083/fhem/floorplan/Wohnung`),
-     **MQTT-Host/Port** (+ ggf. Benutzer/Passwort/TLS), **Basis-Topic** (Standard
-     `fhem/tablet`) und **Geräte-ID** (Standard `tablet1`)
-   - *System*: Sprache und Admin-PIN (Standard `0000`)
-3. Oben **Speichern**, dann zurück → das Dashboard wird angezeigt.
+1. Launch the app. As no URL is configured yet, **Settings** open right away.
+2. Enter:
+   - *Connection*: **dashboard URL** (e.g. `http://192.168.1.10:8083/fhem/floorplan/Home`),
+     **MQTT host/port** (+ optional user/password/TLS), **base topic** (default
+     `fhem/tablet`) and **device ID** (default `tablet1`)
+   - *System*: language and admin PIN (default `0000`)
+3. Tap **Save** at the top, then go back → the dashboard is shown.
 
-Kamera- und Benachrichtigungs-Berechtigung beim ersten Start erlauben.
+Allow the camera and notification permissions on first launch.
 
-**Menü / zurück in die Einstellungen:** vom **linken Bildschirmrand nach rechts
-wischen** → Menü mit MQTT-Status, *Neu laden*, *Cache leeren*, *Bildschirm aus*,
-*Einstellungen* (PIN), *Über* (mit GitHub-Link), *App beenden*.
+**Menu / back to settings:** swipe in from the **left edge** → menu with MQTT status,
+*Reload*, *Clear cache*, *Screen off*, *Settings* (PIN), *About* (with GitHub link),
+*Exit app*.
 
 ### Autostart (optional)
-Die App ist bewusst **kein Launcher/Home-Ersatz** – das Tablet bleibt normal
-bedienbar. Für Autostart nach dem Booten: *Einstellungen → System → „Beim Booten
-starten“* aktivieren. Auf manchen Geräten (Xiaomi, Huawei, …) zusätzlich in den
-Android-Einstellungen den **OEM-Autostart** für FullScreendy erlauben. Für
-Vollverriegelung ggf. Android **Screen Pinning** nutzen.
+The app is deliberately **not a launcher/home replacement** – the tablet stays
+usable normally. For autostart after boot: enable *Settings → System → “Start on
+boot”*. On some devices (Xiaomi, Huawei, …) additionally allow the **OEM autostart**
+for FullScreendy in the Android settings. For full lockdown, consider Android
+**screen pinning**.
 
 ---
 
-## MQTT-Topics
+## MQTT topics
 
-Basis: `<Basis-Topic>/<Geräte-ID>`, im Beispiel `fhem/tablet/tablet1`.
+Base: `<base-topic>/<device-id>`, e.g. `fhem/tablet/tablet1`.
 
-**Das Tablet meldet (retained):**
+**The tablet reports (retained):**
 
-| Topic | Werte |
+| Topic | Values |
 |---|---|
-| `…/status` | `online` / `offline` (Last-Will) |
+| `…/status` | `online` / `offline` (last will) |
 | `…/battery` | `0`–`100` |
 | `…/charging` | `on` / `off` |
 | `…/plug` | `ac` / `usb` / `wireless` / `none` |
-| `…/batteryTemp` | z. B. `24.5` |
+| `…/batteryTemp` | e.g. `24.5` |
 | `…/motion` | `on` / `off` |
 | `…/presence` | `present` / `absent` |
 | `…/screen` | `on` / `off` |
-| `…/brightness` | `0`–`100` oder `auto` |
-| `…/volume` | `0`–`100` (Medienlautstärke) |
-| `…/url` | aktuell geladene URL |
-| `…/ip` | IPv4-Adresse |
-| `…/appVersion` | App-Version, z. B. `0.2.0` |
-| `…/androidVersion` | z. B. `13 (SDK 33)` |
+| `…/brightness` | `0`–`100` or `auto` |
+| `…/volume` | `0`–`100` (media volume) |
+| `…/url` | currently loaded URL |
+| `…/ip` | IPv4 address |
+| `…/appVersion` | app version, e.g. `0.2.0` |
+| `…/androidVersion` | e.g. `13 (SDK 33)` |
 
-**Das Tablet empfängt Befehle (`…/cmd/…`):**
+**The tablet accepts commands (`…/cmd/…`):**
 
-| Topic | Payload | Wirkung |
+| Topic | Payload | Effect |
 |---|---|---|
-| `cmd/tts` | beliebiger Text | spricht den Text (Aliase: `say`, `speak`) |
-| `cmd/mediaplay` | `ordner/sound.mp3` | spielt gespeicherte Tondatei ab (Aliase: `media`, `play`) |
-| `cmd/mediastop` | (egal) | stoppt die Wiedergabe |
-| `cmd/url` | URL | lädt eine andere Seite und meldet sie als `url`-Reading |
-| `cmd/reload` | (egal) | lädt die Seite neu |
-| `cmd/clearcache` | (egal) | leert den Browser-Cache |
-| `cmd/screen` | `on` / `off` | weckt das Display physisch (an) bzw. schwarzes Overlay (aus) |
-| `cmd/screensaver` | `on` / `off` | wie `screen`, invertiert |
-| `cmd/brightness` | `0`–`100` oder `auto` | Helligkeit (voller Bereich mit „Helligkeitssteuerung erlauben") |
-| `cmd/volume` | `0`–`100` | Medienlautstärke (TTS/Töne) |
-| `cmd/lock` | (egal) | sperrt den Bildschirm (benötigt Geräteadmin) |
-| `cmd/unlock` | (egal) | weckt & löst den (unsicheren) Sperrbildschirm |
-| `cmd/vibrate` | Dauer in ms (leer = 200) | Vibrations-Feedback, max. 5000 ms |
+| `cmd/tts` | any text | speaks the text (aliases: `say`, `speak`) |
+| `cmd/mediaplay` | `folder/sound.mp3` | plays a stored sound file (aliases: `media`, `play`) |
+| `cmd/mediastop` | (any) | stops playback |
+| `cmd/url` | URL | loads another page and reports it as the `url` reading |
+| `cmd/reload` | (any) | reloads the page |
+| `cmd/clearcache` | (any) | clears the browser cache |
+| `cmd/screen` | `on` / `off` | physically wakes the display (on) or black overlay (off) |
+| `cmd/screensaver` | `on` / `off` | like `screen`, inverted |
+| `cmd/brightness` | `0`–`100` or `auto` | brightness (full range with “Allow brightness control”) |
+| `cmd/volume` | `0`–`100` | media volume (TTS/sounds) |
+| `cmd/lock` | (any) | locks the screen (needs device admin) |
+| `cmd/unlock` | (any) | wakes & dismisses the (insecure) lock screen |
+| `cmd/vibrate` | duration in ms (empty = 200) | vibration feedback, max 5000 ms |
 
-**Töne:** Dateien in den öffentlichen Ordner **`/sdcard/FullScreendy/`** kopieren
-(über Dateimanager/USB erreichbar). Vorher einmalig **Einstellungen → System →
-„Dateizugriff erlauben"** erteilen. Dann per `cmd/mediaplay ding.mp3` abspielen.
-`http…`-URLs werden gestreamt, Pfade mit `/` als absolute Datei behandelt.
+**Sounds:** copy files into the public folder **`/sdcard/FullScreendy/`** (accessible
+via file manager/USB). Grant **Settings → System → “Allow file access”** once. Then
+play via `cmd/mediaplay ding.mp3`. `http…` URLs are streamed, paths with `/` are
+treated as absolute files.
 
 ---
 
-## FHEM-Konfiguration
+## FHEM configuration
 
-Voraussetzung: ein MQTT-Server in FHEM (`MQTT2_SERVER`) **oder** ein
-`MQTT2_CLIENT`, der mit deinem Broker (z. B. mosquitto) verbunden ist.
+Requires an MQTT server in FHEM (`MQTT2_SERVER`) **or** an `MQTT2_CLIENT` connected
+to your broker (e.g. mosquitto).
 
-### Gerät anlegen
-Sobald das Tablet zum ersten Mal publisht, schlägt FHEM per `autocreate` ein
-`MQTT2_DEVICE` vor. Alternativ manuell:
+### Create the device
+As soon as the tablet publishes for the first time, FHEM suggests an `MQTT2_DEVICE`
+via `autocreate`. Alternatively, manually:
 
 ```
 define fullscreendy MQTT2_DEVICE
@@ -134,7 +137,9 @@ attr fullscreendy readingList fhem/tablet/tablet1/status:.* status \
   fhem/tablet/tablet1/appVersion:.* appVersion \
   fhem/tablet/tablet1/androidVersion:.* androidVersion
 ```
-Set Befehle müssen Manuell gesetzt werden "fullscreendy" durch euren Gerätenamen ersetzten
+
+Set commands must be added manually (replace `fullscreendy` with your device name):
+
 ```
 attr fullscreendy setList screenOn:noArg   fhem/tablet/tablet1/cmd/screen on \
   screenOff:noArg  fhem/tablet/tablet1/cmd/screen off \
@@ -151,112 +156,107 @@ attr fullscreendy setList screenOn:noArg   fhem/tablet/tablet1/cmd/screen on \
 attr fullscreendy stateFormat online battery %
 ```
 
-`$EVTPART1` reicht für Werte ohne Leerzeichen (Zahl, URL, Dateipfad).
+`$EVTPART1` is enough for values without spaces (number, URL, file path).
 
-### Text-to-Speech (ganzer Satz mit Leerzeichen)
-`setList` zerlegt Argumente wortweise, daher für freien Text ein Perl-Ausdruck,
-der `$EVENT` ab dem ersten Leerzeichen abschneidet:
+### Text-to-speech (full sentence with spaces)
+`setList` splits arguments word by word, so for free text use a Perl expression that
+takes everything after the first space of `$EVENT`:
 
 ```
 attr <device> setList say:textField {my @a=split(" ",$EVENT);; shift(@a);; return "fhem/tablet/tablet1/cmd/tts ".join(" ",@a)}
 ```
 
-Alternativ direkt publizieren (`<IODev>` = dein MQTT2_SERVER/CLIENT):
+Or publish directly (`<IODev>` = your MQTT2_SERVER/CLIENT):
 
 ```
-set MQTT2_Broker publish fhem/tablet/tablet1/cmd/tts Guten Morgen, es sind 8 Grad
+set MQTT2_Broker publish fhem/tablet/tablet1/cmd/tts Good morning, it is 8 degrees
 ```
 
-### Beispiele
+### Examples
 ```
-# Bei Bewegung Licht an
-define n_flur_licht notify tablet1:motion:.on set Flurlicht on
+# Light on when motion is detected
+define n_hall_light notify tablet1:motion:.on set HallLight on
 
-# Klingel-Sound abspielen (Datei im Sound-Ordner)
-set MQTT2_Broker publish fhem/tablet/tablet1/cmd/mediaplay tuerklingel.mp3
+# Play a doorbell sound (file in the sound folder)
+set MQTT2_Broker publish fhem/tablet/tablet1/cmd/mediaplay doorbell.mp3
 ```
 
 ---
 
-## Geräte-Einstellungen & Berechtigungen (v0.3)
+## Device settings & permissions
 
-Unter *Einstellungen → Verhalten*:
-- **Bewegungs-Empfindlichkeit** (Schieberegler) für die Kamera-Erkennung.
-- **Wecken bei Ton (Mikrofon)** mit **Ton-Empfindlichkeit** – lauter Umgebungsschall
-  weckt das Display (nur Lautstärke, keine Aufnahme).
-- **Test-Indikatoren**: bei aktivierter Bewegungs-/Ton-Erkennung zeigen grüne
-  Punkte live jede Erkennung an (das Gerät vibriert dabei kurz). Erst speichern,
-  dann winken bzw. Geräusch machen.
-- **Robust gegen Lichtwechsel**: die Bewegungserkennung zieht die globale
-  Helligkeitsänderung ab und verlangt mehrere Frames – gleichmäßiges Flackern
-  (Fernseher, Beleuchtung) löst nicht aus, lokale Bewegung schon. Reagiert es
-  trotzdem noch, die **Bewegungs-Empfindlichkeit** etwas verringern.
+Under *Settings → Behavior*:
+- **Motion sensitivity** (slider) for the camera detection.
+- **Wake on sound (microphone)** with **sound sensitivity** – loud ambient noise
+  wakes the display (loudness only, no recording).
+- **Test indicators**: with motion/sound detection enabled, green dots show each
+  detection live (the device vibrates briefly). Save first, then wave / make noise.
+- **Robust against light changes**: motion detection subtracts the global brightness
+  change and requires several frames – uniform flicker (TV, lighting) does not
+  trigger, local movement does. If it still reacts, lower the **motion sensitivity**.
 
-Unter *Einstellungen → Anzeige*:
-- **Bildschirm immer an** ist standardmäßig aus.
-- **Bildschirm abdunkeln** (Standard 60 s): dunkelt nach Inaktivität per schwarzem
-  Overlay ab, statt das Display per Android-Timeout auszuschalten. Der Bildschirm
-  bleibt technisch an, damit **Kamera/Mikrofon weiterlaufen** und Bewegung/Ton
-  **zuverlässig** wecken – und es blitzt beim Aufwecken **kein Wallpaper/Lockscreen**
-  mehr auf. Berührung oder **jede** Bewegung hebt das Abdunkeln sofort auf und
-  startet den Timer neu. `0 s` = nie. (Ist Wecken-auf-Bewegung/-Ton aktiv, bleibt
-  der Bildschirm automatisch an.)
-- **Bildschirm ausschalten** (Standard 0 = nie): nach *noch längerer* Inaktivität
-  das Display ganz ausschalten (per Geräteadmin). Danach weckt nur Berührung/Power/
-  `cmd/screen on` – Bewegung nicht mehr (Kamera ist dann aus).
+Under *Settings → Display*:
+- **Keep screen always on** is off by default.
+- **Screen dimming** (default 60 s): dims to black via an overlay after inactivity
+  instead of the Android timeout turning the display off. The screen stays
+  technically on so **camera/microphone keep running** and motion/sound wake
+  **reliably** – and there is **no wallpaper/lock screen flash** on wake. Touch or
+  **any** motion clears the dim immediately and restarts the timer. `0 s` = never.
+  (When wake-on-motion/sound is enabled, the screen stays on automatically.)
+- **Turn screen off** (default 0 = never): after *even longer* inactivity, fully turn
+  off the display (via device admin). Afterwards only touch/power/`cmd/screen on`
+  wakes it – motion no longer does (the camera is off then).
 
-Unter *Einstellungen → System → Berechtigungen* (einmalig erteilen; erteilte
-Berechtigungen zeigen ein „✓"):
-- **Kamera erlauben** → für Bewegungserkennung (Frontkamera).
-- **Mikrofon erlauben** → für Ton-Weckung.
-- **Geräteadmin aktivieren** → nötig für `cmd/lock` und „Bildschirm ausschalten".
-- **Helligkeitssteuerung erlauben** (WRITE_SETTINGS) → echte Hardware-Helligkeit
-  über den vollen Bereich (behebt „nur bis ~60 %").
-- **Dateizugriff erlauben** (All-Files-Access) → damit die App Tondateien aus
-  `/sdcard/FullScreendy/` lesen kann.
+Under *Settings → System → Permissions* (grant once; granted permissions show a “✓”):
+- **Allow camera** → for motion detection (front camera).
+- **Allow microphone** → for sound wake.
+- **Enable device admin** → needed for `cmd/lock` and “turn screen off”.
+- **Allow brightness control** (WRITE_SETTINGS) → real hardware brightness over the
+  full range (fixes “only up to ~60 %”).
+- **Allow file access** (all-files access) → so the app can read sound files from
+  `/sdcard/FullScreendy/`.
 
-Der Geräteadmin-Button zeigt den aktuellen Status („Geräteadmin aktiv ✓“) und
-öffnet zur Not die Sicherheits-Einstellungen, falls der direkte Dialog auf dem
-Gerät nicht verfügbar ist.
+The device-admin button shows the current status (“Device admin active ✓”) and falls
+back to the security settings if the direct dialog is unavailable on the device.
 
-## Architektur (Kurzüberblick)
+## Architecture (overview)
 
 ```
-MainActivity ──── WebView (Vollbild-Dashboard) + Menü/Overlay/Helligkeit
-      ▲  KioskBus (Befehle)
+MainActivity ──── WebView (fullscreen dashboard) + menu/overlay/brightness
+      ▲  KioskBus (commands)
       │
-KioskService (Foreground) ── MqttManager (Paho, Auto-Reconnect, Last-Will)
+KioskService (foreground) ── MqttManager (Paho, auto-reconnect, last will)
       ├── BatteryMonitor   → …/battery, …/charging, …
       ├── TtsManager       ← …/cmd/tts
       ├── MediaManager     ← …/cmd/mediaplay
-      ├── SoundDetector    → weckt (AudioRecord, Lautstärke)
-      └── MotionDetector   → …/motion, …/presence (CameraX, lichtkompensiert)
+      ├── SoundDetector    → wakes (AudioRecord, loudness)
+      └── MotionDetector   → …/motion, …/presence (CameraX, light-compensated)
 ```
 
-Einstellungen liegen in Jetpack DataStore; alle Topics werden daraus abgeleitet.
+Settings live in Jetpack DataStore; all topics are derived from them.
 
 ---
 
-## Bekannte Grenzen / To-do
-- `cmd/unlock` weckt und löst nur einen **unsicheren** Sperrbildschirm; eine
-  gesicherte PIN/Muster kann aus Sicherheitsgründen nicht umgangen werden.
-- **Bewegungs-/Ton-Weckung** funktionieren nur, solange der Bildschirm technisch an
-  ist – daher das *Abdunkeln*-Overlay statt echtem Screen-Off. Lässt man das Display
-  per Android-Timeout ganz ausgehen, stoppt die Kamera und Bewegung weckt nicht mehr;
-  dann hilft nur `cmd/screen on` (Wakelock).
-- Kamera/Mikrofon starten nur, wenn die App im Vordergrund war; nach reinem
-  Boot ohne Öffnen bleiben sie aus (Android-Hintergrund-Restriktion).
-- Autostart nach Boot ist je nach Hersteller unzuverlässig (Android blockiert
-  Hintergrund-Activity-Starts) – ggf. **OEM-Autostart** für die App erlauben.
-- TLS nutzt den System-Truststore; selbstsignierte Broker-Zertifikate müssten
-  ergänzt werden.
+## Known limitations / to-do
+- `cmd/unlock` only wakes and dismisses an **insecure** lock screen; a secured
+  PIN/pattern cannot be bypassed for security reasons.
+- **Motion/sound wake** only work while the screen is technically on – hence the
+  *dim* overlay instead of a real screen-off. If you let the display go off via the
+  Android timeout, the camera stops and motion no longer wakes; then only
+  `cmd/screen on` (wakelock) helps.
+- Camera/microphone only start once the app has been in the foreground; after a plain
+  boot without opening it, they stay off (Android background restriction).
+- Autostart after boot is unreliable depending on the manufacturer (Android blocks
+  background activity starts) – allow the **OEM autostart** for the app if needed.
+- TLS uses the system trust store; self-signed broker certificates would need to be
+  added.
 
 ---
 
-## Lizenz
+## License
 
-[MIT](LICENSE) © Glenn-Dandy. Nutzung, Änderung und Weitergabe (auch kommerziell)
-frei, solange Copyright- und Lizenzhinweis erhalten bleiben. Ohne Gewährleistung.
+[MIT](LICENSE) © Glenn-Dandy. Free to use, modify and distribute (including
+commercially) as long as the copyright and license notice are retained. No warranty.
 
-Genutzte Bibliotheken behalten ihre eigenen Lizenzen (u. a. Eclipse Paho,
-AndroidX/Jetpack Compose – Apache-2.0).
+Bundled libraries keep their own licenses (e.g. Eclipse Paho, AndroidX/Jetpack
+Compose – Apache-2.0).
