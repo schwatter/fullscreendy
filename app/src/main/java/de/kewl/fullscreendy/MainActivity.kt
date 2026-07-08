@@ -87,6 +87,12 @@ class MainActivity : ComponentActivity() {
         repo = SettingsRepository(applicationContext)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Fenster über dem Sperrbildschirm zeigen und beim Anschalten sofort in den
+        // Vordergrund holen → beim Aufwecken kein Wallpaper/Lockscreen-Blitzen.
+        runCatching {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
         requestPermissions()
         startKioskService()
 
@@ -218,8 +224,15 @@ class MainActivity : ComponentActivity() {
                     KioskCommand.Reload -> webController.reload()
                     KioskCommand.ClearCache -> webController.clearCache()
                     is KioskCommand.Screen -> {
-                        overlayVisible = !cmd.on
-                        if (cmd.on) activityNonce++ // Abdunkel-Timer neu starten
+                        if (cmd.on) {
+                            // Kam aus dem Abdunkeln/Aus: Fenster über Lockscreen nach vorn
+                            // holen, damit sofort das Dashboard erscheint (kein Wallpaper).
+                            if (overlayVisible) unlockDevice()
+                            overlayVisible = false
+                            activityNonce++
+                        } else {
+                            overlayVisible = true
+                        }
                     }
                     is KioskCommand.Brightness -> brightness = cmd.level
                     KioskCommand.Unlock -> unlockDevice()
@@ -248,7 +261,9 @@ class MainActivity : ComponentActivity() {
                 )
             }
         ) {
-            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            // Schwarzer Hintergrund (kein heller "weißer Blitz" beim Aufwecken, bevor
+            // die WebView neu zeichnet). Unterseiten haben eigene, thematisierte Flächen.
+            Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

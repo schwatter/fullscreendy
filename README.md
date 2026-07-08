@@ -205,7 +205,10 @@ Under *Settings → Display*:
   (When wake-on-motion/sound is enabled, the screen stays on automatically.)
 - **Turn screen off** (default 0 = never): after *even longer* inactivity, fully turn
   off the display (via device admin). Afterwards only touch/power/`cmd/screen on`
-  wakes it – motion no longer does (the camera is off then).
+  wakes it – motion no longer does (the camera is off then). On a real screen-off the
+  system may briefly show its wake animation on resume; for **completely flicker-free**
+  wake use **dimming only** (turn off = 0). The app window then stays in the foreground
+  and the dashboard is there instantly.
 
 Under *Settings → System → Permissions* (grant once; granted permissions show a “✓”):
 - **Allow camera** → for motion detection (front camera).

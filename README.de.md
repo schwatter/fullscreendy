@@ -209,7 +209,10 @@ Unter *Einstellungen → Anzeige*:
   der Bildschirm automatisch an.)
 - **Bildschirm ausschalten** (Standard 0 = nie): nach *noch längerer* Inaktivität
   das Display ganz ausschalten (per Geräteadmin). Danach weckt nur Berührung/Power/
-  `cmd/screen on` – Bewegung nicht mehr (Kamera ist dann aus).
+  `cmd/screen on` – Bewegung nicht mehr (Kamera ist dann aus). Beim echten
+  Ausschalten kann das System beim Aufwecken kurz seine Aufwach-Animation zeigen;
+  für **komplett flackerfreies** Aufwecken nur **Abdunkeln** nutzen (Ausschalten = 0).
+  Dann bleibt das App-Fenster im Vordergrund und das Dashboard ist sofort da.
 
 Unter *Einstellungen → System → Berechtigungen* (einmalig erteilen; erteilte
 Berechtigungen zeigen ein „✓"):

@@ -63,6 +63,8 @@ fun KioskWebView(
                     }
                 }
                 webChromeClient = WebChromeClient()
+                // Schwarz statt Weiß während Lade-/Neuzeichnen-Lücken (kein weißer Blitz).
+                setBackgroundColor(android.graphics.Color.BLACK)
                 settings.apply {
                     javaScriptEnabled = true
                     domStorageEnabled = true
